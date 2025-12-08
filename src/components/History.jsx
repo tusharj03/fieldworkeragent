@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, FileText, ChevronRight, Search, Calendar, Trash2 } from 'lucide-react';
 
-export function History({ onSelectReport }) {
+export function History({ onSelectReport, user, mode }) {
     const [reports, setReports] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -9,8 +9,18 @@ export function History({ onSelectReport }) {
         const loadReports = () => {
             try {
                 const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+
+                // Filter by User ID and Mode
+                // Note: Only show reports that belong to this user AND match the current mode (EMS/FIRE)
+                const filtered = savedReports.filter(r => {
+                    const matchesUser = r.userId === user.uid;
+                    const reportMode = r.mode || 'EMS'; // Default to EMS for legacy reports
+                    const matchesMode = reportMode === mode;
+                    return matchesUser && matchesMode;
+                });
+
                 // Sort by timestamp descending
-                const sorted = savedReports.sort((a, b) =>
+                const sorted = filtered.sort((a, b) =>
                     new Date(b.timestamp) - new Date(a.timestamp)
                 );
                 setReports(sorted);
@@ -21,14 +31,19 @@ export function History({ onSelectReport }) {
         };
 
         loadReports();
-    }, []);
+    }, [user.uid, mode]);
 
     const handleDelete = (e, id) => {
         e.stopPropagation();
         if (window.confirm('Are you sure you want to delete this report?')) {
-            const updated = reports.filter(r => r.id !== id);
-            setReports(updated);
-            localStorage.setItem('saved_reports', JSON.stringify(updated));
+            const allReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+            const updatedAll = allReports.filter(r => r.id !== id);
+
+            localStorage.setItem('saved_reports', JSON.stringify(updatedAll));
+
+            // Re-filter locally to update UI
+            const updatedLocal = reports.filter(r => r.id !== id);
+            setReports(updatedLocal);
         }
     };
 
@@ -50,8 +65,12 @@ export function History({ onSelectReport }) {
         <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight">Report History</h2>
-                    <p className="text-slate-400 mt-1">Access and manage your past incident reports</p>
+                    <h2 className="text-3xl font-bold text-white tracking-tight">
+                        {mode === 'FIRE' ? 'Fire Incident History' : 'EMS Patient History'}
+                    </h2>
+                    <p className="text-slate-400 mt-1">
+                        Viewing records for user <span className="text-white font-medium">{user.email}</span>
+                    </p>
                 </div>
                 <div className="bg-slate-900/50 p-2 rounded-lg border border-white/10">
                     <span className="text-slate-400 text-sm font-medium px-2">
@@ -81,7 +100,7 @@ export function History({ onSelectReport }) {
                         </div>
                         <h3 className="text-lg font-medium text-slate-300 mb-1">No Reports Found</h3>
                         <p className="text-slate-500">
-                            {searchTerm ? "Try adjusting your search terms" : "Start recording to generate your first report"}
+                            {searchTerm ? "Try adjusting your search terms" : `Start your first ${mode} report`}
                         </p>
                     </div>
                 ) : (
@@ -91,7 +110,7 @@ export function History({ onSelectReport }) {
                             onClick={() => onSelectReport(report)}
                             className="group relative bg-slate-900/40 hover:bg-slate-800/60 border border-white/5 hover:border-orange-500/30 rounded-xl p-5 transition-all cursor-pointer overflow-hidden"
                         >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className={`absolute top-0 left-0 w-1 h-full opacity-0 group-hover:opacity-100 transition-opacity ${mode === 'FIRE' ? 'bg-gradient-to-b from-red-500 to-orange-600' : 'bg-gradient-to-b from-orange-500 to-red-600'}`} />
 
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
@@ -100,8 +119,8 @@ export function History({ onSelectReport }) {
                                             {report.category || 'Incident Report'}
                                         </h3>
                                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${report.urgency?.toLowerCase() === 'high'
-                                                ? 'text-red-400 bg-red-500/10 border-red-500/20'
-                                                : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                            ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                                            : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                                             }`}>
                                             {report.urgency || 'Normal'}
                                         </span>
