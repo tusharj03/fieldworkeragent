@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren } from 'lucide-react';
+import { VitalsChart } from './VitalsChart';
 
 export function ReportCard({ report, onExport }) {
     if (!report) return null;
@@ -192,6 +193,11 @@ export function ReportCard({ report, onExport }) {
                         {/* EMS TIMELINES */}
                         {!isFireMode && report.vitals_timeline && (
                             <div>
+                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">VITALS VISUALIZATION</h4>
+                                <div className="mb-6">
+                                    <VitalsChart vitalsData={report.vitals_timeline} />
+                                </div>
+
                                 <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">VITALS LOG</h4>
                                 <div className="overflow-x-auto rounded-lg border border-white/5">
                                     <table className="w-full text-sm text-left">
