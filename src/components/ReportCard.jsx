@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren } from 'lucide-react';
+import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic } from 'lucide-react';
 import { VitalsChart } from './VitalsChart';
 
-export function ReportCard({ report, onExport }) {
+export function ReportCard({ report, onExport, audioUrl }) {
     if (!report) return null;
 
     const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
@@ -413,6 +413,7 @@ export function ReportCard({ report, onExport }) {
             </Section>
 
             {/* Actions Footer */}
+
             <div className="flex flex-col md:flex-row gap-4 pt-4">
                 <button
                     onClick={onExport}
@@ -421,6 +422,18 @@ export function ReportCard({ report, onExport }) {
                     <Download size={18} className="group-hover:animate-bounce" />
                     Download Official PDF Packet
                 </button>
+
+                {audioUrl && (
+                    <a
+                        href={audioUrl}
+                        download={`recording-${report.id || 'session'}.webm`}
+                        className="px-6 py-3 rounded-xl glass-button flex items-center justify-center gap-2 font-semibold hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                    >
+                        <Mic size={18} />
+                        Download Original Recording
+                    </a>
+                )}
+
                 <button
                     onClick={async () => {
                         if (navigator.share) {

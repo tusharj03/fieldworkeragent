@@ -5,8 +5,11 @@ export const useVoiceRecognition = () => {
   const [finalTranscript, setFinalTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState(null);
-  
+  const [audioUrl, setAudioUrl] = useState(null);
+
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const isListeningDesired = useRef(false); // Track if user WANTS to be recording
 
   useEffect(() => {
@@ -73,18 +76,47 @@ export const useVoiceRecognition = () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback(async () => {
     if (recognitionRef.current && !isRecording) {
       try {
+        // Start Audio Recording
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const url = URL.createObjectURL(audioBlob);
+          setAudioUrl(url);
+
+          // Stop all tracks to release microphone
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+
+        // Start Speech Recognition
         isListeningDesired.current = true;
         recognitionRef.current.start();
         setIsRecording(true);
         setError(null);
+        setAudioUrl(null); // Clear previous recording
       } catch (err) {
         console.error('Failed to start recording:', err);
+        setError('Could not access microphone for audio recording.');
       }
     }
   }, [isRecording]);
@@ -93,6 +125,11 @@ export const useVoiceRecognition = () => {
     if (recognitionRef.current && isRecording) {
       isListeningDesired.current = false;
       recognitionRef.current.stop();
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+
       setIsRecording(false);
     }
   }, [isRecording]);
@@ -100,11 +137,13 @@ export const useVoiceRecognition = () => {
   const clearTranscript = useCallback(() => {
     setFinalTranscript('');
     setInterimTranscript('');
+    setAudioUrl(null);
   }, []);
 
   return {
     isRecording,
     transcript: finalTranscript + (interimTranscript ? ' ' + interimTranscript : ''),
+    audioUrl,
     error,
     startRecording,
     stopRecording,

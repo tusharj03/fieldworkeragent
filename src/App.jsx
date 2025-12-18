@@ -18,6 +18,7 @@ function App() {
     startRecording,
     stopRecording,
     clearTranscript,
+    audioUrl,
     error: voiceError
   } = useVoiceRecognition();
 
@@ -257,6 +258,7 @@ function App() {
                 <div className="animate-slide-up">
                   <ReportCard
                     report={report}
+                    audioUrl={audioUrl}
                     onExport={() => PdfService.generateReport(report, transcript)}
                   />
                 </div>
