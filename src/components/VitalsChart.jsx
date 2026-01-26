@@ -51,14 +51,14 @@ export function VitalsChart({ vitalsData }) {
             systolic: parseInt(bpParts[0]) || null,
             diastolic: parseInt(bpParts[1]) || null,
         };
-    }).reverse(); // Recharts usually likes chronological order
+    });
 
     const TabButton = ({ id, label, icon: Icon }) => (
         <button
             onClick={() => setActiveTab(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === id
-                    ? 'bg-white/10 text-white shadow-lg border border-white/10'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                ? 'bg-white/10 text-white shadow-lg border border-white/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
         >
             <Icon size={16} />
