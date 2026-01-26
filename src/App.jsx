@@ -10,6 +10,7 @@ import { PdfService } from './services/pdf';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Activity, HardHat, AlertCircle, LayoutDashboard, FileText, History as HistoryIcon, Menu, X, LogOut } from 'lucide-react';
+import BeaconLogo from './assets/beacon_logo.png';
 
 function App() {
   const {
@@ -139,8 +140,7 @@ function App() {
               <HardHat size={24} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">Field Agent</h1>
-              <p className="text-slate-500 text-xs font-medium tracking-wider uppercase">Pro Edition</p>
+              <img src={BeaconLogo} alt="Beacon" className="h-12 object-contain" />
             </div>
           </div>
 
