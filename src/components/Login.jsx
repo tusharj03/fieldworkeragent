@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { HardHat, LogIn, AlertCircle, UserPlus, ArrowRight } from 'lucide-react';
+import { LogIn, AlertCircle, UserPlus, ArrowRight } from 'lucide-react';
 import BeaconLogo from '../assets/beacon_logo.png';
 
 export function Login({ onLoginSuccess }) {
@@ -50,9 +50,7 @@ export function Login({ onLoginSuccess }) {
 
                 <div className="relative z-10">
                     <div className="text-center mb-10">
-                        <div className={`inline-flex p-4 rounded-2xl shadow-lg mb-6 transition-all duration-500 ${isSignUp ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-blue-500/20' : 'bg-gradient-to-br from-orange-500 to-red-600 shadow-orange-500/20'}`}>
-                            <HardHat size={48} className="text-white" />
-                        </div>
+
                         <img src={BeaconLogo} alt="Beacon" className="h-24 mx-auto mb-4 object-contain" />
                         <p className="text-slate-400">{isSignUp ? 'Create Agent Profile' : 'Secure Access Portal'}</p>
                     </div>

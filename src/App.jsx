@@ -1,27 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MicrophoneButton } from './components/MicrophoneButton';
 import { ReportCard } from './components/ReportCard';
 import { History } from './components/History';
 import { Templates } from './components/Templates';
 import { Login } from './components/Login';
-import { useVoiceRecognition } from './hooks/useVoiceRecognition';
+import { useRealtimeTranscription } from './hooks/useRealtimeTranscription';
 import { RorkService } from './services/rork';
 import { PdfService } from './services/pdf';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Activity, HardHat, AlertCircle, LayoutDashboard, FileText, History as HistoryIcon, Menu, X, LogOut } from 'lucide-react';
+import { Activity, HardHat, AlertCircle, LayoutDashboard, FileText, History as HistoryIcon, Menu, X, LogOut, UserCheck, UserX } from 'lucide-react';
 import BeaconLogo from './assets/beacon_logo.png';
 
 function App() {
   const {
     isRecording,
-    transcript,
+    transcriptSegments,
+    activeSpeakers,
     startRecording,
     stopRecording,
     clearTranscript,
     audioUrl,
     error: voiceError
-  } = useVoiceRecognition();
+  } = useRealtimeTranscription();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,27 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [mode, setMode] = useState('EMS'); // 'EMS' | 'FIRE'
+  const [consentedSpeakers, setConsentedSpeakers] = useState(new Set());
+
+  // Filter segments based on consent
+  const visibleSegments = useMemo(() => {
+    return transcriptSegments.filter(seg => consentedSpeakers.has(seg.speaker));
+  }, [transcriptSegments, consentedSpeakers]);
+
+  // Flatten for analysis/display
+  const fullTranscript = visibleSegments.map(s => s.text).join(' ');
+
+  const toggleConsent = (speakerId) => {
+    setConsentedSpeakers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(speakerId)) {
+        newSet.delete(speakerId);
+      } else {
+        newSet.add(speakerId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -47,20 +69,21 @@ function App() {
       setError(null);
       setReport(null);
       clearTranscript();
+      setConsentedSpeakers(new Set()); // Reset consent on new session? Or keep? Let's reset for safety.
       startRecording();
     }
   };
 
   const handleStopAndAnalyze = async () => {
     stopRecording();
-    if (!transcript.trim()) {
-      setError("No speech detected. Please try again.");
+    if (!fullTranscript.trim()) {
+      setError("No consented speech detected. Please approve a speaker.");
       return;
     }
 
     setIsAnalyzing(true);
     try {
-      const result = await RorkService.analyzeTranscript(transcript, mode);
+      const result = await RorkService.analyzeTranscript(fullTranscript, mode);
 
       // Add ID and timestamp if missing
       const reportWithMeta = {
@@ -68,7 +91,7 @@ function App() {
         id: Math.floor(Date.now() % 10000),
         timestamp: new Date().toISOString(),
         mode: mode,
-        userId: user.uid // Link report to current user
+        userId: user.uid
       };
 
       setReport(reportWithMeta);
@@ -214,23 +237,66 @@ function App() {
                     Ready to Report?
                   </h2>
                   <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
-                    Tap the microphone to start recording your incident report, safety log, or patient encounter.
+                    Tap the microphone. New voices must be approved to be recorded.
                   </p>
+                </div>
+              )}
+
+              {/* Speaker Management UI */}
+              {isRecording && (
+                <div className="bg-slate-900/40 border border-white/10 rounded-xl p-4 animate-fade-in">
+                  <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Detected Speakers</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {activeSpeakers.length === 0 && <span className="text-slate-600 text-sm italic">Listening...</span>}
+                    {activeSpeakers.map(speakerId => {
+                      const isConsented = consentedSpeakers.has(speakerId);
+                      return (
+                        <button
+                          key={speakerId}
+                          onClick={() => toggleConsent(speakerId)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${isConsented
+                            ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
+                            : 'bg-slate-800 border-white/10 text-slate-400 hover:bg-slate-700 hover:text-white'
+                            }`}
+                        >
+                          {isConsented ? <UserCheck size={14} /> : <UserX size={14} />}
+                          Voice {speakerId}
+                          <span className="ml-1 text-xs opacity-60">
+                            {isConsented ? 'Approved' : 'Unknown'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
               {/* Transcript Area */}
               <div className={`
                 glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500
-                ${transcript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
+                ${transcriptSegments.length > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
               `}>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Transcript</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Transcript (Consented Only)</span>
                   {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                 </div>
-                <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                  {transcript}
-                </p>
+                <div className="space-y-4">
+                  {visibleSegments.map((seg, idx) => (
+                    <div key={idx} className="flex gap-4">
+                      <div className="w-16 shrink-0 text-xs font-bold text-slate-500 pt-1">
+                        Voice {seg.speaker}
+                      </div>
+                      <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light flex-1">
+                        {seg.text}
+                      </p>
+                    </div>
+                  ))}
+                  {visibleSegments.length === 0 && transcriptSegments.length > 0 && (
+                    <div className="text-center py-4 text-slate-500 italic">
+                      Audio detected but no speakers approved yet.
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Analysis Loading */}
@@ -259,7 +325,7 @@ function App() {
                   <ReportCard
                     report={report}
                     audioUrl={audioUrl}
-                    onExport={() => PdfService.generateReport(report, transcript)}
+                    onExport={() => PdfService.generateReport(report, fullTranscript)}
                   />
                 </div>
               )}
