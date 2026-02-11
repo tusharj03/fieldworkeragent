@@ -8,12 +8,13 @@ export const RorkService = {
    * @param {string} mode - 'EMS' or 'FIRE'.
    * @returns {Promise<object>} - The structured analysis result.
    */
-  async analyzeTranscript(transcript, mode = 'EMS') {
+  async analyzeTranscript(transcript, mode = 'EMS', template = null) {
     let systemPrompt;
 
     if (mode === 'FIRE') {
-      systemPrompt = `You are an expert Fire/Rescue reporting assistant.
-      Your job is to listen to the firefighter's transcript and extract technical data for NFIRS and incident reporting.
+      systemPrompt = `You are an expert Fire/Rescue reporting assistant using the NERIS (National Emergency Response Information System) standard.
+      Your job is to listen to the firefighter's transcript and extract technical data for incident reporting.
+      ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
       
       Return a JSON object with this EXACT structure:
       {
@@ -21,26 +22,27 @@ export const RorkService = {
         "category": "Structure Fire | Wildland | Hazmat | MVA | Rescue | Alarm",
         "urgency": "High | Medium | Low",
         "scene_info": {
-            "type": "e.g., Residential, Commercial",
-            "building": "e.g., 2-story wood frame",
-            "smoke_conditions": "Description of smoke color/volume",
-            "flame_conditions": "Description of visible fire",
-            "exposures": "Any threatened structures"
+            "type": "e.g., Residential, Commercial, Mixed Use",
+            "building": "e.g., 2-story wood frame, 5-story brick",
+            "smoke_conditions": "Description of smoke color/volume/velocity",
+            "flame_conditions": "Description of visible fire location/extent",
+            "exposures": "Any threatened structures (Side A, B, C, D)"
         },
         "timeline": [
             { "time": "HH:MM", "event": "Brief description" } 
         ],
         "actions_taken": [
-            "List specific fireground actions (e.g., 'Stretched 1.75 line', 'Vertical vent')"
+            "List specific NERIS Primary and Additional Actions (e.g., 'Fire Control', 'Search & Rescue', 'Ventilation')"
         ],
-        "hazards": [
-             "List safety hazards (e.g., 'Collapse risk', 'Live wires')"
-        ],
-        "nfirs_mapping": {
-            "incident_type": "Likely NFIRS code/desc",
-            "property_use": "Likely property use code",
-            "cause": "Suspected cause if mentioned"
+        "neris_data": {
+            "incident_type": "Likely NERIS incident type code/description",
+            "property_use": "Likely NERIS property use code/description",
+            "entities_involved": ["List people/agencies involved"],
+            "stabilization_status": "Controlled | Uncontrolled | Under Investigation"
         },
+        "hazards": [
+             "List safety hazards (e.g., 'Collapse risk', 'Live wires', 'Flashover potential')"
+        ],
         "action_items": ["Follow-up items for investigator or safety officer"]
       }
 
@@ -50,6 +52,7 @@ export const RorkService = {
       // EMS PROMPT
       systemPrompt = `You are an expert EMS field assistant. 
       Your job is to listen to the transcript and extract key information to fill out a ePCR / patient care report.
+      ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
       
       Return a JSON object with the following structure:
       {

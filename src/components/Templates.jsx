@@ -1,7 +1,43 @@
-import React from 'react';
-import { FileText, Plus, ChevronRight, Activity, Heart, AlertTriangle, Stethoscope, Flame, Home, Truck, Biohazard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Plus, ChevronRight, Activity, Heart, AlertTriangle, Stethoscope, Flame, Home, Truck, Biohazard, X, Save } from 'lucide-react';
 
 export function Templates({ onSelectTemplate, mode = 'EMS' }) {
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [customTemplates, setCustomTemplates] = useState([]);
+    const [newTemplate, setNewTemplate] = useState({
+        title: '',
+        description: '',
+        mode: mode
+    });
+
+    useEffect(() => {
+        const saved = localStorage.getItem('custom_templates');
+        if (saved) {
+            setCustomTemplates(JSON.parse(saved));
+        }
+    }, []);
+
+    const handleSaveTemplate = () => {
+        if (!newTemplate.title || !newTemplate.description) return;
+
+        const template = {
+            id: `custom-${Date.now()}`,
+            title: newTemplate.title,
+            description: newTemplate.description,
+            icon: FileText, // Default icon
+            color: 'text-purple-400',
+            bg: 'bg-purple-500/10',
+            border: 'border-purple-500/20',
+            mode: newTemplate.mode,
+            isCustom: true
+        };
+
+        const updated = [template, ...customTemplates];
+        setCustomTemplates(updated);
+        localStorage.setItem('custom_templates', JSON.stringify(updated));
+        setShowCreateModal(false);
+        setNewTemplate({ title: '', description: '', mode: mode });
+    };
 
     // EMS TEMPLATES
     const emsTemplates = [
@@ -43,12 +79,12 @@ export function Templates({ onSelectTemplate, mode = 'EMS' }) {
         }
     ];
 
-    // FIRE TEMPLATES (NEW)
+    // FIRE TEMPLATES (NERIS)
     const fireTemplates = [
         {
             id: 'structure_fire',
-            title: 'Structure Fire (NFIRS)',
-            description: 'Document building type, attack lines, search results, and ventilation logic for residential/commercial fires.',
+            title: 'Structure Fire (NERIS)',
+            description: 'NERIS-compliant workflow. Documents building type, specific actions taken, search results, and ventilation logic.',
             icon: Home,
             color: 'text-red-500',
             bg: 'bg-red-500/10',
@@ -83,10 +119,14 @@ export function Templates({ onSelectTemplate, mode = 'EMS' }) {
         }
     ];
 
-    const currentTemplates = mode === 'FIRE' ? fireTemplates : emsTemplates;
+    const defaultTemplates = mode === 'FIRE' ? fireTemplates : emsTemplates;
+    const relevantCustomTemplates = customTemplates.filter(t => t.mode === mode);
+
+    // Merge custom templtaes first
+    const currentTemplates = [...relevantCustomTemplates, ...defaultTemplates];
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in relative">
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h2 className="text-3xl font-bold text-white tracking-tight">
@@ -94,28 +134,89 @@ export function Templates({ onSelectTemplate, mode = 'EMS' }) {
                     </h2>
                     <p className="text-slate-400 mt-1">Start a new report using a pre-configured workflow</p>
                 </div>
-                <button className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+                <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                >
                     <Plus size={16} />
                     Create Template
                 </button>
             </div>
 
+            {/* Create Modal Overlay */}
+            {showCreateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-white">New {mode} Template</h3>
+                            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Template Title</label>
+                                <input
+                                    type="text"
+                                    value={newTemplate.title}
+                                    onChange={e => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                                    placeholder="e.g., Water Rescue, Lift Assist..."
+                                    className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-orange-500"
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Description / Instructions</label>
+                                <textarea
+                                    value={newTemplate.description}
+                                    onChange={e => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                                    placeholder="Describe the workflow or specific data points this template should capture..."
+                                    className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-orange-500 h-32 resize-none"
+                                />
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    onClick={() => setShowCreateModal(false)}
+                                    className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveTemplate}
+                                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold shadow-lg hover:from-orange-400 hover:to-red-500 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Save size={18} />
+                                    Save Template
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid md:grid-cols-2 gap-4">
                 {currentTemplates.map((template) => (
                     <div
                         key={template.id}
-                        // onClick={() => onSelectTemplate(template)} // Placeholder for now
-                        className="group bg-slate-900/40 hover:bg-slate-800/60 border border-white/5 hover:border-white/10 rounded-2xl p-6 transition-all cursor-pointer"
+                        onClick={() => onSelectTemplate(template)}
+                        className="group bg-slate-900/40 hover:bg-slate-800/60 border border-white/5 hover:border-white/10 rounded-2xl p-6 transition-all cursor-pointer relative overflow-hidden"
                     >
+                        {template.isCustom && (
+                            <div className="absolute top-0 right-0 bg-purple-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg">
+                                Custom
+                            </div>
+                        )}
                         <div className="flex items-start gap-4">
                             <div className={`p-3 rounded-xl ${template.bg} ${template.color} border ${template.border}`}>
-                                <template.icon size={24} />
+                                {template.isCustom ? <FileText size={24} /> : <template.icon size={24} />}
                             </div>
                             <div className="flex-1">
                                 <h3 className="text-lg font-semibold text-slate-200 mb-2 group-hover:text-white transition-colors">
                                     {template.title}
                                 </h3>
-                                <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                                <p className="text-sm text-slate-400 leading-relaxed mb-4 line-clamp-2">
                                     {template.description}
                                 </p>
                                 <div className="flex items-center text-xs font-medium text-slate-500 group-hover:text-orange-400 transition-colors uppercase tracking-wider gap-1">

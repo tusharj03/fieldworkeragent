@@ -28,6 +28,10 @@ export const useRealtimeTranscription = () => {
                 smart_format: true,
                 diarize: true,
                 interim_results: true,
+                utterance_end_ms: 1000,
+                vad_events: true,
+                filler_words: false,
+                punctuate: true,
             });
 
             deepgramConnectionRef.current = connection;
@@ -36,6 +40,7 @@ export const useRealtimeTranscription = () => {
                 setIsRecording(true);
                 setError(null);
 
+                // Use 250ms chunks for lower latency streaming
                 const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 mediaRecorderRef.current = mediaRecorder;
                 const audioChunks = [];
@@ -56,11 +61,7 @@ export const useRealtimeTranscription = () => {
                     stream.getTracks().forEach(track => track.stop());
                 });
 
-                mediaRecorder.start(100); // Send chunks every 100ms
-            });
-
-            connection.on('transcriptReceived', (packet) => {
-                // Handle metadata or keep-alive if needed
+                mediaRecorder.start(250);
             });
 
             connection.on('Results', (data) => {
@@ -70,29 +71,40 @@ export const useRealtimeTranscription = () => {
                 const text = alt.transcript;
                 const isFinal = data.is_final;
 
-                // Deepgram gives words with speaker tags
-                // For simplicity in this demo, we'll take the speaker of the first word as the "block speaker"
-                // A more robust solution maps word-by-word.
-                const speaker = alt.words && alt.words.length > 0 ? alt.words[0].speaker : 0; // Default to 0 if unknown
+                // Robust speaker detection
+                // If words exist, take the first word's speaker.
+                // If not, fallback to previous logical speaker or 0.
+                const speaker = alt.words?.[0]?.speaker ?? 0;
 
-                if (text) {
+                if (text && text.trim().length > 0) {
                     setActiveSpeakers(prev => new Set(prev).add(speaker));
 
                     setTranscriptSegments(prev => {
-                        // Logic to merge interim results or append new segments
-                        // This is a naive implementation: just push everything. 
-                        // In reality, we want to replace the LAST segment if it was not final, or append specific words.
-                        // Simplified for prototype:
+                        const newSegments = [...prev];
+                        const lastIndex = newSegments.length - 1;
 
-                        // If the last segment is from the same speaker and NOT final, update it.
-                        const last = prev[prev.length - 1];
-                        if (last && !last.isFinal && last.speaker === speaker) {
-                            const newPrev = [...prev];
-                            newPrev[newPrev.length - 1] = { speaker, text, isFinal };
-                            return newPrev;
+                        if (lastIndex >= 0) {
+                            const lastSegment = newSegments[lastIndex];
+
+                            // Critical Fix:
+                            // If the last segment was NOT final (interim), we ALWAYS overwrite it with the new incoming result.
+                            // This handles corrections, speaker re-assignment, and text updates properly.
+                            // We do NOT append a new segment unless the previous one was finalized.
+                            if (!lastSegment.isFinal) {
+                                newSegments[lastIndex] = {
+                                    speaker,
+                                    text,
+                                    isFinal
+                                };
+                            } else {
+                                // Previous was final, so this is a new utterance.
+                                newSegments.push({ speaker, text, isFinal });
+                            }
                         } else {
-                            return [...prev, { speaker, text, isFinal }];
+                            // First segment ever
+                            newSegments.push({ speaker, text, isFinal });
                         }
+                        return newSegments;
                     });
                 }
             });

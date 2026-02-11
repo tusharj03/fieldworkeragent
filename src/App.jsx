@@ -32,6 +32,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [mode, setMode] = useState('EMS'); // 'EMS' | 'FIRE'
+  const [activeTemplate, setActiveTemplate] = useState(null);
   const [consentedSpeakers, setConsentedSpeakers] = useState(new Set());
 
   // Filter segments based on consent
@@ -83,7 +84,7 @@ function App() {
 
     setIsAnalyzing(true);
     try {
-      const result = await RorkService.analyzeTranscript(fullTranscript, mode);
+      const result = await RorkService.analyzeTranscript(fullTranscript, mode, activeTemplate);
 
       // Add ID and timestamp if missing
       const reportWithMeta = {
@@ -91,10 +92,12 @@ function App() {
         id: Math.floor(Date.now() % 10000),
         timestamp: new Date().toISOString(),
         mode: mode,
-        userId: user.uid
+        userId: user.uid,
+        templateUsed: activeTemplate?.title || 'Generative'
       };
 
       setReport(reportWithMeta);
+      setActiveTemplate(null); // Reset template after use
 
       const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
       localStorage.setItem('saved_reports', JSON.stringify([reportWithMeta, ...savedReports]));
@@ -234,10 +237,12 @@ function App() {
               {!report && !isAnalyzing && (
                 <div className="text-center py-12 animate-fade-in">
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 text-glow">
-                    Ready to Report?
+                    {activeTemplate ? `Active: ${activeTemplate.title}` : 'Ready to Report?'}
                   </h2>
                   <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
-                    Tap the microphone. New voices must be approved to be recorded.
+                    {activeTemplate
+                      ? "Recording will be analyzed using this specific workflow."
+                      : "Tap the microphone. New voices must be approved to be recorded."}
                   </p>
                 </div>
               )}
@@ -282,12 +287,13 @@ function App() {
                 </div>
                 <div className="space-y-4">
                   {visibleSegments.map((seg, idx) => (
-                    <div key={idx} className="flex gap-4">
+                    <div key={idx} className={`flex gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-70' : 'opacity-100'}`}>
                       <div className="w-16 shrink-0 text-xs font-bold text-slate-500 pt-1">
                         Voice {seg.speaker}
                       </div>
                       <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light flex-1">
                         {seg.text}
+                        {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
                       </p>
                     </div>
                   ))}
@@ -347,7 +353,13 @@ function App() {
           )}
 
           {currentView === 'templates' && (
-            <Templates mode={mode} />
+            <Templates
+              mode={mode}
+              onSelectTemplate={(template) => {
+                setActiveTemplate(template);
+                setCurrentView('dashboard');
+              }}
+            />
           )}
 
         </div>
