@@ -13,7 +13,7 @@ export const RorkService = {
 
     if (mode === 'FIRE') {
       systemPrompt = `You are an expert Fire/Rescue reporting assistant.
-      Your job is to listen to the firefighter's transcript and extract technical data for NFIRS and incident reporting.
+      Your job is to listen to the firefighter's transcript and extract technical data for NERIS (National Emergency Response Information System) and incident reporting.
       
       Return a JSON object with this EXACT structure:
       {
@@ -31,14 +31,14 @@ export const RorkService = {
             { "time": "HH:MM", "event": "Brief description" } 
         ],
         "actions_taken": [
-            "List specific fireground actions (e.g., 'Stretched 1.75 line', 'Vertical vent')"
+            "List specific NERIS actions taken (e.g., 'Fire Control', 'Search', 'Ventilation')"
         ],
         "hazards": [
              "List safety hazards (e.g., 'Collapse risk', 'Live wires')"
         ],
-        "nfirs_mapping": {
-            "incident_type": "Likely NFIRS code/desc",
-            "property_use": "Likely property use code",
+        "neris_mapping": {
+            "incident_type": "Likely NERIS incident type code/desc",
+            "property_use": "Likely NERIS property use code/desc",
             "cause": "Suspected cause if mentioned"
         },
         "action_items": ["Follow-up items for investigator or safety officer"]

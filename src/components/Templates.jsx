@@ -47,7 +47,7 @@ export function Templates({ onSelectTemplate, mode = 'EMS' }) {
     const fireTemplates = [
         {
             id: 'structure_fire',
-            title: 'Structure Fire (NFIRS)',
+            title: 'Structure Fire (NERIS)',
             description: 'Document building type, attack lines, search results, and ventilation logic for residential/commercial fires.',
             icon: Home,
             color: 'text-red-500',

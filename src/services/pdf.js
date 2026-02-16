@@ -1,159 +1,298 @@
 import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 export const PdfService = {
     generateReport(report, transcript) {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
-        const margin = 20;
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
         let yPos = 20;
 
-        const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
-        const primaryColor = isFireMode ? [220, 38, 38] : [249, 115, 22]; // Red vs Orange
+        const isFireMode = report.mode === 'FIRE' || report.neris_mapping;
 
-        // Title
-        doc.setFontSize(22);
-        doc.setTextColor(...primaryColor);
-        doc.text(isFireMode ? "Fire Incident Report" : "Field Agent Report", margin, yPos);
-        yPos += 15;
+        // Color Palette
+        const colors = {
+            primary: isFireMode ? [220, 38, 38] : [16, 185, 129], // Red-600 or Emerald-500
+            secondary: [71, 85, 105], // Slate-600
+            accent: isFireMode ? [254, 242, 242] : [236, 253, 245], // Red-50 or Emerald-50
+            text: [30, 41, 59], // Slate-800
+            lightText: [100, 116, 139], // Slate-500
+            white: [255, 255, 255],
+            border: [226, 232, 240] // Slate-200
+        };
 
-        // Meta Info
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Date: ${new Date().toLocaleString()}`, margin, yPos);
-        yPos += 6;
-        doc.text(`ID: #${report.id || 'N/A'}`, margin, yPos);
-        yPos += 6;
-        doc.text(`Category: ${report.category || 'General'}`, margin, yPos);
-        yPos += 6;
-        doc.text(`Urgency: ${report.urgency || 'Normal'}`, margin, yPos);
-        yPos += 15;
+        // Helper: Draw Header
+        const drawHeader = () => {
+            // Top colored bar
+            doc.setFillColor(...colors.primary);
+            doc.rect(0, 0, pageWidth, 6, 'F');
 
-        // Summary
-        doc.setFontSize(14);
-        doc.setTextColor(0);
-        doc.text("Executive Summary", margin, yPos);
-        yPos += 8;
-        doc.setFontSize(11);
-        const summaryLines = doc.splitTextToSize(report.summary || '', pageWidth - (margin * 2));
-        doc.text(summaryLines, margin, yPos);
-        yPos += (summaryLines.length * 7) + 10;
+            // Logo/Title area
+            doc.setFontSize(24);
+            doc.setTextColor(...colors.primary);
+            doc.setFont("helvetica", "bold");
+            doc.text(isFireMode ? "FIRE INCIDENT REPORT" : "EMS PATIENT CARE REPORT", margin, 25);
 
-        // FIRE: Scene Info
-        if (isFireMode && report.scene_info) {
-            doc.setFontSize(14);
-            doc.text("Scene Information", margin, yPos);
-            yPos += 8;
+            // Meta info (right aligned)
             doc.setFontSize(10);
-            const info = [
-                `Type: ${report.scene_info.type}`,
-                `Building: ${report.scene_info.building}`,
-                `Smoke: ${report.scene_info.smoke_conditions}`,
-                `Flames: ${report.scene_info.flame_conditions}`,
-                `Exposures: ${report.scene_info.exposures}`
-            ];
-            info.forEach(line => {
-                doc.text(`• ${line}`, margin, yPos);
-                yPos += 6;
-            });
-            yPos += 10;
-        }
+            doc.setTextColor(...colors.secondary);
+            doc.setFont("helvetica", "normal");
 
-        // FIRE: Timeline
-        if (isFireMode && report.timeline) {
-            doc.setFontSize(14);
-            doc.text("Fireground Timeline", margin, yPos);
-            yPos += 8;
-            doc.setFontSize(10);
-            report.timeline.forEach(event => {
-                doc.setTextColor(...primaryColor);
-                doc.text(event.time, margin, yPos);
-                doc.setTextColor(0);
-                doc.text(event.event, margin + 20, yPos);
-                yPos += 6;
-            });
-            yPos += 10;
-        }
+            const dateStr = new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString();
+            const rightMargin = pageWidth - margin;
 
-        // FIRE: Actions
-        if (isFireMode && report.actions_taken) {
-            doc.setFontSize(14);
-            doc.text("Actions Taken", margin, yPos);
-            yPos += 8;
-            doc.setFontSize(10);
-            report.actions_taken.forEach(action => {
-                doc.text(`• ${action}`, margin, yPos);
-                yPos += 6;
-            });
-            yPos += 10;
-        }
+            doc.text(`Generated: ${dateStr}`, rightMargin, 20, { align: "right" });
+            doc.text(`Reference ID: #${report.id || 'N/A'}`, rightMargin, 25, { align: "right" });
 
-        // FIRE: Hazards
-        if (isFireMode && report.hazards) {
-            doc.setFontSize(14);
-            doc.setTextColor(220, 38, 38);
-            doc.text("Identified Hazards", margin, yPos);
-            doc.setTextColor(0);
-            yPos += 8;
-            doc.setFontSize(10);
-            report.hazards.forEach(hazard => {
-                doc.text(`[HAZARD] ${hazard}`, margin, yPos);
-                yPos += 6;
-            });
-            yPos += 10;
-        }
+            yPos = 35;
+        };
 
-        // FIRE: NFIRS
-        if (isFireMode && report.nfirs_mapping) {
-            doc.setFontSize(14);
-            doc.text("NFIRS Coding", margin, yPos);
-            yPos += 8;
-            doc.setFontSize(10);
-            doc.text(`Incident Type: ${report.nfirs_mapping.incident_type}`, margin, yPos); yPos += 6;
-            doc.text(`Property Use: ${report.nfirs_mapping.property_use}`, margin, yPos); yPos += 6;
-            doc.text(`Cause: ${report.nfirs_mapping.cause}`, margin, yPos); yPos += 6;
-            yPos += 10;
-        }
+        // Helper: Draw Section Title
+        const drawSectionTitle = (title) => {
+            // Check for page break
+            if (yPos > pageHeight - 30) {
+                doc.addPage();
+                yPos = 20;
+            }
 
-        // EMS Sections (if applicable and NOT clean fire mode, usually mutually exclusive but good to be safe)
-        if (!isFireMode && report.vitals_timeline) {
-            doc.setFontSize(14);
-            doc.text("Vitals Log", margin, yPos);
-            yPos += 8;
-            doc.setFontSize(10);
-            // Simple table dump
-            report.vitals_timeline.forEach(row => {
-                doc.text(`${row.time} | BP: ${row.bp} | HR: ${row.hr} | SPO2: ${row.spo2}`, margin, yPos);
-                yPos += 6;
-            });
-            yPos += 10;
-        }
+            doc.setFillColor(...colors.accent);
+            doc.rect(margin, yPos, pageWidth - (margin * 2), 8, 'F');
 
-        // Action Items (Shared)
-        if (report.action_items && report.action_items.length > 0) {
-            doc.setFontSize(14);
-            doc.text("Follow-up Action Items", margin, yPos);
-            yPos += 8;
             doc.setFontSize(11);
-            report.action_items.forEach(item => {
-                doc.text(`[ ] ${item}`, margin, yPos);
-                yPos += 7;
+            doc.setTextColor(...colors.primary);
+            doc.setFont("helvetica", "bold");
+            doc.text(title.toUpperCase(), margin + 3, yPos + 5.5);
+
+            yPos += 14; // Space after title
+        };
+
+        // Helper: Key-Value Grid
+        const drawKeyValueGrid = (data, startY) => {
+            const keys = Object.keys(data);
+            if (keys.length === 0) return startY;
+
+            const colWidth = (pageWidth - (margin * 2)) / 2;
+            let currentY = startY;
+
+            doc.setFontSize(10);
+
+            keys.forEach((key, index) => {
+                const x = margin + ((index % 2) * colWidth);
+                if (index > 0 && index % 2 === 0) currentY += 10;
+
+                // Label
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(...colors.lightText);
+                doc.text(key.toUpperCase(), x, currentY);
+
+                // Value
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(...colors.text);
+                const value = String(data[key] || "N/A");
+                doc.text(value, x, currentY + 5);
             });
-            yPos += 10;
+
+            return currentY + 15;
+        };
+
+        // --- START GENERATION ---
+        drawHeader();
+
+        // 1. INCIDENT OVERVIEW (Grid)
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(...colors.border);
+        doc.rect(margin, yPos, pageWidth - (margin * 2), 25); // Box container
+
+        // Inner layout for Overview
+        let overviewY = yPos + 6;
+        doc.setFontSize(9);
+        doc.setTextColor(...colors.lightText);
+        doc.text("INCIDENT CATEGORY", margin + 5, overviewY);
+        doc.text("URGENCY LEVEL", margin + 60, overviewY);
+        doc.text("LOCATION (Approx)", margin + 120, overviewY); // Placeholder if we had it
+
+        overviewY += 6;
+        doc.setFontSize(12);
+        doc.setTextColor(...colors.text);
+        doc.setFont("helvetica", "bold");
+        doc.text(report.category || "General", margin + 5, overviewY);
+
+        // Urgency Badge-ish text
+        doc.setTextColor(...(report.urgency === 'High' ? [220, 38, 38] : [30, 41, 59]));
+        doc.text(report.urgency || "Normal", margin + 60, overviewY);
+
+        doc.setTextColor(...colors.text);
+        doc.text("Unknown Location", margin + 120, overviewY);
+
+        yPos += 35;
+
+        // 2. EXECUTIVE SUMMARY
+        drawSectionTitle("Executive Summary");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(...colors.text);
+
+        const summaryLines = doc.splitTextToSize(report.summary || "No summary available.", pageWidth - (margin * 2));
+        doc.text(summaryLines, margin, yPos);
+        yPos += (summaryLines.length * 5) + 10;
+
+        // 3. SCENE INFO / PATIENT INFO (Conditional)
+        if (isFireMode && report.scene_info) {
+            drawSectionTitle("Scene & Structure Information");
+
+            const sceneData = {
+                "Type": report.scene_info.type,
+                "Building Construction": report.scene_info.building,
+                "Smoke Conditions": report.scene_info.smoke_conditions,
+                "Flame Conditions": report.scene_info.flame_conditions,
+                "Exposures": report.scene_info.exposures
+            };
+            yPos = drawKeyValueGrid(sceneData, yPos);
+        }
+        else if (!isFireMode && report.patient_info) {
+            drawSectionTitle("Patient Information");
+            const patientData = {
+                "Patient Name": report.patient_info.name,
+                "Age": report.patient_info.age,
+                "Sex": report.patient_info.sex,
+                "Mental Status": report.patient_info.mental_status
+            };
+            yPos = drawKeyValueGrid(patientData, yPos);
         }
 
-        // Transcript (New Page)
+        // 4. NERIS / BILLING CODES
+        if (isFireMode && report.neris_mapping) {
+            drawSectionTitle("NERIS Coding Classification");
+
+            // Draw distinct boxes for the 3 main codes
+            const boxWidth = (pageWidth - (margin * 2) - 10) / 3;
+            const boxHeight = 25;
+            let boxX = margin;
+
+            const codes = [
+                { label: "Incident Type", value: report.neris_mapping.incident_type },
+                { label: "Property Use", value: report.neris_mapping.property_use },
+                { label: "Cause / Ignition", value: report.neris_mapping.cause }
+            ];
+
+            codes.forEach((code) => {
+                // Background
+                doc.setFillColor(248, 250, 252); // Slate-50
+                doc.setDrawColor(...colors.border);
+                doc.roundedRect(boxX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
+
+                // Label
+                doc.setFontSize(8);
+                doc.setTextColor(...colors.lightText);
+                doc.setFont("helvetica", "bold");
+                doc.text(code.label.toUpperCase(), boxX + 3, yPos + 6);
+
+                // Value
+                doc.setFontSize(10);
+                doc.setTextColor(...colors.primary);
+                const valueLines = doc.splitTextToSize(code.value || "N/A", boxWidth - 6);
+                doc.text(valueLines, boxX + 3, yPos + 12);
+
+                boxX += boxWidth + 5;
+            });
+
+            yPos += boxHeight + 15;
+        }
+
+        // 5. ACTIONS & SUB-TABLES (using autoTable)
+
+        // FIRE ACTIONS
+        if (isFireMode && report.actions_taken && report.actions_taken.length > 0) {
+            doc.autoTable({
+                startY: yPos,
+                head: [['Actions Taken (NERIS)']],
+                body: report.actions_taken.map(a => [a]),
+                theme: 'striped',
+                headStyles: { fillColor: colors.primary, textColor: 255, fontStyle: 'bold' },
+                margin: { left: margin, right: margin }
+            });
+            yPos = doc.lastAutoTable.finalY + 10;
+        }
+
+        // EMS / FIRE TIMELINE
+        const timelineData = isFireMode ? report.timeline : report.vitals_timeline;
+        if (timelineData && timelineData.length > 0) {
+            // Headers differ by mode
+            const headers = isFireMode
+                ? [['Time', 'Event/Description']]
+                : [['Time', 'BP', 'HR', 'RR', 'SpO2', 'O2']];
+
+            const body = isFireMode
+                ? timelineData.map(t => [t.time, t.event])
+                : timelineData.map(v => [v.time, v.bp, v.hr, v.rr, v.spo2, v.o2]);
+
+            doc.setFontSize(14);
+            doc.setTextColor(...colors.text);
+            doc.text(isFireMode ? "Incident Timeline" : "Vitals Log", margin, yPos);
+            yPos += 5;
+
+            doc.autoTable({
+                startY: yPos,
+                head: headers,
+                body: body,
+                theme: 'grid',
+                headStyles: { fillColor: colors.secondary, textColor: 255 },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin }
+            });
+            yPos = doc.lastAutoTable.finalY + 15;
+        }
+
+        // HAZARDS (Fire) or ACTION ITEMS (Both)
+        const hazards = report.hazards || [];
+        const actions = report.action_items || [];
+        const combinedLists = [];
+
+        if (hazards.length > 0) combinedLists.push({ title: "Hazards", items: hazards, color: [220, 38, 38] }); // Red text
+        if (actions.length > 0) combinedLists.push({ title: "Action Items", items: actions, color: [0, 0, 0] });
+
+        if (combinedLists.length > 0) {
+            // Simple list custom drawing
+            if (yPos > pageHeight - 40) doc.addPage();
+
+            combinedLists.forEach(list => {
+                doc.setFontSize(12);
+                doc.setTextColor(...colors.text);
+                doc.setFont("helvetica", "bold");
+                doc.text(list.title, margin, yPos);
+                yPos += 5;
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                list.items.forEach(item => {
+                    doc.setTextColor(...list.color);
+                    doc.text(`• ${item}`, margin + 5, yPos);
+                    yPos += 6;
+                });
+                yPos += 10;
+            });
+        }
+
+        // TRANSCRIPT ATTACHMENT PAGE
         if (transcript) {
             doc.addPage();
-            yPos = 20;
-            doc.setFontSize(14);
-            doc.text("Original Transcript", margin, yPos);
-            yPos += 10;
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            const transcriptLines = doc.splitTextToSize(transcript, pageWidth - (margin * 2));
-            doc.text(transcriptLines, margin, yPos);
+            doc.setFillColor(...colors.secondary);
+            doc.rect(0, 0, pageWidth, 20, 'F');
+            doc.setFontSize(16);
+            doc.setTextColor(255, 255, 255);
+            doc.text("Original Transcript Analysis", margin, 13);
+
+            yPos = 30;
+            doc.setFontSize(9);
+            doc.setTextColor(...colors.lightText);
+            doc.setFont("courier", "normal");
+
+            const lines = doc.splitTextToSize(transcript, pageWidth - (margin * 2));
+            doc.text(lines, margin, yPos);
         }
 
-        doc.save(`report-${report.mode || 'ems'}-${Date.now()}.pdf`);
+        // Save
+        doc.save(`field-report-${report.id || Date.now()}.pdf`);
     }
 };

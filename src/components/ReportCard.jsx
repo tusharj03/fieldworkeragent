@@ -5,7 +5,7 @@ import { VitalsChart } from './VitalsChart';
 export function ReportCard({ report, onExport, audioUrl }) {
     if (!report) return null;
 
-    const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
+    const isFireMode = report.mode === 'FIRE' || report.neris_mapping;
 
     const getUrgencyColor = (urgency) => {
         switch (urgency?.toLowerCase()) {
@@ -282,21 +282,21 @@ export function ReportCard({ report, onExport, audioUrl }) {
                 </Section>
             )}
 
-            {/* FIRE: NFIRS Mapping */}
-            {isFireMode && report.nfirs_mapping && (
-                <Section title="NFIRS Codes" icon={Layers}>
+            {/* FIRE: NERIS Mapping */}
+            {isFireMode && report.neris_mapping && (
+                <Section title="NERIS Codes" icon={Layers}>
                     <div className="grid md:grid-cols-3 gap-4">
                         <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
                             <span className="text-xs text-slate-500 uppercase block mb-1">Incident Type</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.incident_type}</span>
+                            <span className="text-lg font-mono font-bold text-white">{report.neris_mapping.incident_type}</span>
                         </div>
                         <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
                             <span className="text-xs text-slate-500 uppercase block mb-1">Property Use</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.property_use}</span>
+                            <span className="text-lg font-mono font-bold text-white">{report.neris_mapping.property_use}</span>
                         </div>
                         <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
                             <span className="text-xs text-slate-500 uppercase block mb-1">Cause / Ignition</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.cause}</span>
+                            <span className="text-lg font-mono font-bold text-white">{report.neris_mapping.cause}</span>
                         </div>
                     </div>
                 </Section>
