@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export const PdfService = {
     generateReport(report, transcript) {
@@ -204,7 +204,7 @@ export const PdfService = {
 
         // FIRE ACTIONS
         if (isFireMode && report.actions_taken && report.actions_taken.length > 0) {
-            doc.autoTable({
+            autoTable(doc, {
                 startY: yPos,
                 head: [['Actions Taken (NERIS)']],
                 body: report.actions_taken.map(a => [a]),
@@ -232,7 +232,7 @@ export const PdfService = {
             doc.text(isFireMode ? "Incident Timeline" : "Vitals Log", margin, yPos);
             yPos += 5;
 
-            doc.autoTable({
+            autoTable(doc, {
                 startY: yPos,
                 head: headers,
                 body: body,
