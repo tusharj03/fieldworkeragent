@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth'; // Added sendPasswordResetEmail
 import { auth } from '../services/firebase';
-import { LogIn, AlertCircle, UserPlus, ArrowRight } from 'lucide-react';
+import { LogIn, AlertCircle, UserPlus, ArrowRight, KeyRound, CheckCircle } from 'lucide-react'; // Added KeyRound, CheckCircle
 import BeaconLogo from '../assets/beacon_logo.png';
 
 export function Login({ onLoginSuccess }) {
@@ -10,12 +10,14 @@ export function Login({ onLoginSuccess }) {
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState(''); // New success message state
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setSuccessMsg('');
 
         try {
             if (isSignUp) {
@@ -35,6 +37,25 @@ export function Login({ onLoginSuccess }) {
             if (err.code === 'auth/weak-password') msg = 'Password should be at least 6 characters.';
             if (err.code === 'auth/invalid-credential') msg = 'Invalid email or password.';
             setError(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!email) {
+            setError('Please enter your email address first.');
+            return;
+        }
+        setError('');
+        setSuccessMsg('');
+        setLoading(true);
+        try {
+            await sendPasswordResetEmail(auth, email);
+            setSuccessMsg('Password reset email sent! Check your inbox.');
+        } catch (err) {
+            console.error(err);
+            setError('Failed to send reset email. Verify the email address.');
         } finally {
             setLoading(false);
         }
@@ -83,10 +104,22 @@ export function Login({ onLoginSuccess }) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-slate-300">Password</label>
+                                {!isSignUp && (
+                                    <button
+                                        type="button"
+                                        onClick={handleForgotPassword}
+                                        className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1"
+                                    >
+                                        <KeyRound size={12} />
+                                        Forgot Password?
+                                    </button>
+                                )}
+                            </div>
                             <input
                                 type="password"
-                                required
+                                required={!successMsg} // Password not needed if just resetting
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
@@ -98,6 +131,13 @@ export function Login({ onLoginSuccess }) {
                             <div className="flex items-center gap-2 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm border border-red-500/20 animate-shake">
                                 <AlertCircle size={16} />
                                 {error}
+                            </div>
+                        )}
+
+                        {successMsg && (
+                            <div className="flex items-center gap-2 text-green-400 bg-green-500/10 p-3 rounded-lg text-sm border border-green-500/20 animate-fade-in">
+                                <CheckCircle size={16} />
+                                {successMsg}
                             </div>
                         )}
 
@@ -122,6 +162,7 @@ export function Login({ onLoginSuccess }) {
                             onClick={() => {
                                 setIsSignUp(!isSignUp);
                                 setError('');
+                                setSuccessMsg('');
                             }}
                             className="text-slate-400 text-sm hover:text-white transition-colors flex items-center justify-center gap-1 mx-auto group"
                         >
@@ -133,10 +174,11 @@ export function Login({ onLoginSuccess }) {
                     <p className="text-center text-slate-500 text-xs mt-8">
                         Restricted System • Authorized Personnel Only
                         <br />
-                        Field Agent AI v2.5.0
+                        Beacon AI v2.5.0
                     </p>
                 </div>
             </div>
         </div>
     );
 }
+

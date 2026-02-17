@@ -4,7 +4,9 @@ import { ReportCard } from './components/ReportCard';
 import { History } from './components/History';
 import { Templates } from './components/Templates';
 import { Login } from './components/Login';
+import { Profile } from './components/Profile';
 import { useRealtimeTranscription } from './hooks/useRealtimeTranscription';
+import { useVoiceRecognition } from './hooks/useVoiceRecognition';
 import { RorkService } from './services/rork';
 import { PdfService } from './services/pdf';
 import { auth } from './services/firebase';
@@ -13,16 +15,29 @@ import { Activity, HardHat, AlertCircle, LayoutDashboard, FileText, History as H
 import BeaconLogo from './assets/beacon_logo.png';
 
 function App() {
-  const {
-    isRecording,
-    transcriptSegments,
-    activeSpeakers,
-    startRecording,
-    stopRecording,
-    clearTranscript,
-    audioUrl,
-    error: voiceError
-  } = useRealtimeTranscription();
+  const [mode, setMode] = useState(() => localStorage.getItem('app_mode') || 'EMS');
+
+  useEffect(() => {
+    localStorage.setItem('app_mode', mode);
+  }, [mode]);
+
+  const emsTranscription = useRealtimeTranscription();
+  const fireTranscription = useVoiceRecognition();
+
+  // Unified access to the active hook's data
+  // Fire hook returns: { isRecording, transcript, startRecording, stopRecording, clearTranscript, audioUrl, error }
+  // EMS hook returns: { isRecording, transcriptSegments, activeSpeakers, startRecording, stopRecording, clearTranscript, audioUrl, error }
+
+  const currentTranscriber = mode === 'FIRE' ? fireTranscription : emsTranscription;
+  const isRecording = currentTranscriber.isRecording;
+  const audioUrl = currentTranscriber.audioUrl;
+  const voiceError = currentTranscriber.error;
+
+  // Specific data structures
+  const transcriptSegments = mode === 'EMS' ? emsTranscription.transcriptSegments : [];
+  const activeSpeakers = mode === 'EMS' ? emsTranscription.activeSpeakers : [];
+  const simpleTranscript = mode === 'FIRE' ? fireTranscription.transcript : '';
+
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,17 +46,20 @@ function App() {
   const [error, setError] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
-  const [mode, setMode] = useState('EMS'); // 'EMS' | 'FIRE'
+  // const [mode, setMode] = useState('EMS'); // REPLACED ABOVE WITH PERSISTENCE
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [consentedSpeakers, setConsentedSpeakers] = useState(new Set());
 
-  // Filter segments based on consent
+  // Filter segments based on consent (EMS only)
   const visibleSegments = useMemo(() => {
+    if (mode === 'FIRE') return [];
     return transcriptSegments.filter(seg => consentedSpeakers.has(seg.speaker));
-  }, [transcriptSegments, consentedSpeakers]);
+  }, [transcriptSegments, consentedSpeakers, mode]);
 
   // Flatten for analysis/display
-  const fullTranscript = visibleSegments.map(s => s.text).join(' ');
+  const fullTranscript = mode === 'FIRE'
+    ? simpleTranscript
+    : visibleSegments.map(s => s.text).join(' ');
 
   const toggleConsent = (speakerId) => {
     setConsentedSpeakers(prev => {
@@ -69,16 +87,24 @@ function App() {
     } else {
       setError(null);
       setReport(null);
-      clearTranscript();
-      setConsentedSpeakers(new Set()); // Reset consent on new session? Or keep? Let's reset for safety.
-      startRecording();
+      currentTranscriber.clearTranscript();
+      if (mode === 'EMS') {
+        setConsentedSpeakers(new Set());
+      }
+      currentTranscriber.startRecording();
     }
   };
 
   const handleStopAndAnalyze = async () => {
-    stopRecording();
+    currentTranscriber.stopRecording();
+
+    // Safety check for empty transcript
     if (!fullTranscript.trim()) {
-      setError("No consented speech detected. Please approve a speaker.");
+      if (mode === 'EMS') {
+        setError("No consented speech detected. Please approve a speaker.");
+      } else {
+        setError("No speech detected. Please try again.");
+      }
       return;
     }
 
@@ -222,9 +248,14 @@ function App() {
               <Activity size={14} className={isRecording ? "text-red-500 animate-pulse" : "text-slate-500"} />
               {isRecording ? "Recording Active" : "Ready to Capture"}
             </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-600 border border-white/10 flex items-center justify-center text-xs font-bold">
+            {/* Clickable Profile Icon */}
+            <button
+              onClick={() => setCurrentView('profile')}
+              className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-600 border border-white/10 flex items-center justify-center text-xs font-bold hover:ring-2 hover:ring-orange-500/50 transition-all cursor-pointer"
+              title="Account Settings"
+            >
               {user.email[0].toUpperCase()}
-            </div>
+            </button>
           </div>
         </header>
 
@@ -247,8 +278,8 @@ function App() {
                 </div>
               )}
 
-              {/* Speaker Management UI */}
-              {isRecording && (
+              {/* Speaker Management UI - EMS ONLY */}
+              {isRecording && mode === 'EMS' && (
                 <div className="bg-slate-900/40 border border-white/10 rounded-xl p-4 animate-fade-in">
                   <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Detected Speakers</h3>
                   <div className="flex flex-wrap gap-3">
@@ -279,30 +310,42 @@ function App() {
               {/* Transcript Area */}
               <div className={`
                 glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500
-                ${transcriptSegments.length > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
+                ${(mode === 'EMS' ? transcriptSegments.length > 0 : simpleTranscript.length > 0) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
               `}>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Transcript (Consented Only)</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    {mode === 'EMS' ? 'Live Transcript (Consented Only)' : 'Live Transcript'}
+                  </span>
                   {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                 </div>
-                <div className="space-y-4">
-                  {visibleSegments.map((seg, idx) => (
-                    <div key={idx} className={`flex gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-70' : 'opacity-100'}`}>
-                      <div className="w-16 shrink-0 text-xs font-bold text-slate-500 pt-1">
-                        Voice {seg.speaker}
+
+                {mode === 'EMS' ? (
+                  // EMS: Segmented View
+                  <div className="space-y-4">
+                    {visibleSegments.map((seg, idx) => (
+                      <div key={idx} className={`flex gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-70' : 'opacity-100'}`}>
+                        <div className="w-16 shrink-0 text-xs font-bold text-slate-500 pt-1">
+                          Voice {seg.speaker}
+                        </div>
+                        <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light flex-1">
+                          {seg.text}
+                          {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
+                        </p>
                       </div>
-                      <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light flex-1">
-                        {seg.text}
-                        {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
-                      </p>
-                    </div>
-                  ))}
-                  {visibleSegments.length === 0 && transcriptSegments.length > 0 && (
-                    <div className="text-center py-4 text-slate-500 italic">
-                      Audio detected but no speakers approved yet.
-                    </div>
-                  )}
-                </div>
+                    ))}
+                    {visibleSegments.length === 0 && transcriptSegments.length > 0 && (
+                      <div className="text-center py-4 text-slate-500 italic">
+                        Audio detected but no speakers approved yet.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // FIRE: Simple Text View
+                  <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
+                    {simpleTranscript}
+                    {isRecording && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
+                  </p>
+                )}
               </div>
 
               {/* Analysis Loading */}
@@ -359,6 +402,13 @@ function App() {
                 setActiveTemplate(template);
                 setCurrentView('dashboard');
               }}
+            />
+          )}
+
+          {currentView === 'profile' && (
+            <Profile
+              user={user}
+              onBack={() => setCurrentView('dashboard')}
             />
           )}
 
