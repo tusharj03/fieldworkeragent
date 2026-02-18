@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MicrophoneButton } from './MicrophoneButton';
 import { ReportCard } from './ReportCard';
+import { FireActionItems } from './FireActionItems';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { RorkService } from '../services/rork';
 import { PdfService } from '../services/pdf';
@@ -22,6 +23,8 @@ export const FireView = ({ user }) => {
         const saved = localStorage.getItem('fire_report');
         return saved ? JSON.parse(saved) : null;
     });
+
+    const [actionItems, setActionItems] = useState([]);
     // Transcript State Management
     // ---------------------------
     // Track the ID of the current in-progress report
@@ -122,13 +125,33 @@ export const FireView = ({ user }) => {
         }
     }, [activeTranscript, report, currentReportId, user.uid]);
 
+    // Refs for polling interval
+    const activeTranscriptRef = useRef(activeTranscript);
+    const actionItemsRef = useRef(actionItems);
 
+    useEffect(() => {
+        activeTranscriptRef.current = activeTranscript;
+        actionItemsRef.current = actionItems;
+    }, [activeTranscript, actionItems]);
 
+    // Poll for Action Items Updates
+    useEffect(() => {
+        if (!isRecording) return;
 
+        const interval = setInterval(async () => {
+            if (!activeTranscriptRef.current.trim()) return;
 
-    // Combine restored text (from previous session) with live text (from current session)
+            try {
+                // Use the ref to get the latest transcript without restarting the interval
+                const updatedItems = await RorkService.updateActionItems(activeTranscriptRef.current, actionItemsRef.current);
+                setActionItems(updatedItems);
+            } catch (err) {
+                console.error("Failed to update action items", err);
+            }
+        }, 10000); // 10 seconds
 
-
+        return () => clearInterval(interval);
+    }, [isRecording]);
 
 
 
@@ -154,6 +177,8 @@ export const FireView = ({ user }) => {
                 clearTranscript();
             }
             startRecording();
+            // Reset action items on new recording start
+            setActionItems([]);
         }
     };
 
@@ -255,6 +280,14 @@ export const FireView = ({ user }) => {
     // Otherwise use the active (restored + live) transcript
     const displayTranscript = report ? persistedTranscript : activeTranscript;
 
+    const handleToggleActionItem = (itemId) => {
+        setActionItems(prev => prev.map(item =>
+            item.id === itemId
+                ? { ...item, isCompleted: !item.isCompleted }
+                : item
+        ));
+    };
+
     return (
         <>
             <div className="max-w-4xl mx-auto space-y-8 relative">
@@ -297,20 +330,33 @@ export const FireView = ({ user }) => {
                     </div>
                 )}
 
-                {/* Transcript Area */}
+                {/* Transcript Area & Action Items */}
                 <div className={`
-          glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500
+          transition-all duration-500
           ${displayTranscript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
         `}>
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            {report ? 'Report Transcript' : 'Live Transcript'}
-                        </span>
-                        {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Transcript Column */}
+                        <div className="lg:col-span-2 glass-panel rounded-2xl p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    {report ? 'Report Transcript' : 'Live Transcript'}
+                                </span>
+                                {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                            </div>
+                            <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
+                                {displayTranscript}
+                            </p>
+                        </div>
+
+                        {/* Action Items Column */}
+                        <div className="lg:col-span-1">
+                            <FireActionItems
+                                items={actionItems}
+                                onToggle={handleToggleActionItem}
+                            />
+                        </div>
                     </div>
-                    <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                        {displayTranscript}
-                    </p>
                 </div>
 
                 {/* Analysis Loading */}
@@ -324,6 +370,7 @@ export const FireView = ({ user }) => {
                         <p className="text-sm text-slate-500 mt-2">Extracting key details</p>
                     </div>
                 )}
+
 
                 {/* Error State */}
                 {(error || voiceError) && (

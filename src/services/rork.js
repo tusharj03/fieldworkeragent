@@ -3,11 +3,89 @@
  */
 export const RorkService = {
   /**
-   * Analyzes the transcript to generate a structured report.
-   * @param {string} transcript - The text transcript from voice recognition.
-   * @param {string} mode - 'EMS' or 'FIRE'.
-   * @returns {Promise<object>} - The structured analysis result.
+   * Updates the list of action items based on the current transcript.
+   * @param {string} transcript - The current accumulated transcript.
+   * @param {Array} currentItems - The existing list of action items.
+   * @returns {Promise<Array>} - The updated list of action items.
    */
+  async updateActionItems(transcript, currentItems) {
+    const systemPrompt = `You are an expert Fire/Rescue AI assistant.
+      Your job is to monitor a live transcript of a fire incident and update a dynamic checklist of action items.
+      
+      You will be given:
+      1. The current list of action items (some may be completed, some pending).
+      2. The latest transcript of the incident.
+      
+      Your goal is to:
+      1. MARK COMPLETED: If the transcript indicates an item has been done, mark it as completed.
+      2. ADD NEW ITEMS: based on the evolving scenario, add new critical tasks that the firefighter needs to do next.
+      3. KEEP PENDING: If an item hasn't been done yet, keep it in the list.
+      
+      CRITICAL: The list starts EMPTY. You MUST populate it based on the context.
+      Common standard items to consider adding (only if relevant to the specific call type):
+      - "Water supply" (if fire/suppression needed)
+      - "Fire suppression" (if working fire)
+      - "Primary search" (if search needed)
+      - "Secondary search" (if search needed)
+      - "Ventilation" (if needed)
+      - "Overhaul" (if needed)
+      
+      Return a JSON object with a single key "items", which is an array of objects:
+      {
+        "id": "unique_string_id",
+        "text": "Action description",
+        "isCompleted": boolean,
+        "isNew": boolean (true if you just added it this turn)
+      }
+      
+      IMPORTANT:
+      - Do NOT remove completed items. Keep them but set isCompleted: true.
+      - Do NOT duplicate items.
+      - Be aggressive in marking items complete if the user says something like "Primary search complete" or "We have water on the fire".
+      - Keep descriptions short and actionable (e.g., "Establish RIT", "Utilities Control").
+      `;
+
+    const requestBody = {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            transcript: transcript,
+            currentItems: currentItems
+          })
+        }
+      ]
+    };
+
+    try {
+      // Re-using the same endpoint as analyzeTranscript
+      // In a real app complexity, we might want a different endpoint or a 'stream' but for now one-shot is fine
+      const response = await fetch('https://toolkit.rork.com/text/llm/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const parsed = this.parseAIResponse(data.completion);
+      return parsed.items || currentItems; // Fallback to current if parse fails
+    } catch (error) {
+      console.error('Rork AI Action Item Update Error:', error);
+      return currentItems; // Fail gracefully by returning existing state
+    }
+  },
+
+  /**
+   * Analyzes the transcript to generate a structured report.
+ * @param {string} transcript - The text transcript from voice recognition.
+ * @param {string} mode - 'EMS' or 'FIRE'.
+ * @returns {Promise<object>} - The structured analysis result.
+ */
   async analyzeTranscript(transcript, mode = 'EMS', template = null) {
     let systemPrompt;
 
