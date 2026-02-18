@@ -337,7 +337,7 @@ export const FireView = ({ user }) => {
         `}>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Transcript Column */}
-                        <div className="lg:col-span-2 glass-panel rounded-2xl p-6 md:p-8">
+                        <div className={`${actionItems.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'} glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500`}>
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                     {report ? 'Report Transcript' : 'Live Transcript'}
@@ -349,13 +349,15 @@ export const FireView = ({ user }) => {
                             </p>
                         </div>
 
-                        {/* Action Items Column */}
-                        <div className="lg:col-span-1">
-                            <FireActionItems
-                                items={actionItems}
-                                onToggle={handleToggleActionItem}
-                            />
-                        </div>
+                        {/* Action Items Column - Only show if there are items */}
+                        {actionItems.length > 0 && (
+                            <div className="lg:col-span-1 animate-slide-in-right">
+                                <FireActionItems
+                                    items={actionItems}
+                                    onToggle={handleToggleActionItem}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
