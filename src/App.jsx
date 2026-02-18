@@ -174,15 +174,17 @@ function App() {
               user={user}
               mode={mode}
               onSelectReport={(savedReport) => {
-                // We'd need to handle this by passing report down to view, 
-                // but Views manage their own report state in this simple refactor.
-                // For now, simpler to just switch view.
-                // NOTE: To fully support History clicking -> View Report, 
-                // we'd need to hoist `report` state back up or expose a method.
-                // Given the constraint "make it work like old", the old app had state in App.
-                // But for now let's keep isolation. If user clicks history item, we might need a "Viewer" component.
-                // Actually, History onSelect usually just sets `report` in App.
-                // Let's assume for this fix, we just want recording to work.
+                if (mode === 'FIRE') {
+                  // For Fire mode, we pass data via localStorage as FireView initializes from there
+                  localStorage.setItem('fire_report', JSON.stringify(savedReport));
+                  localStorage.setItem('fire_transcript', savedReport.transcript || '');
+                } else {
+                  // For EMS mode, we might need a different strategy or it handles it differently.
+                  // For now, focusing on the reported issue with "Recoring Page" (Fire).
+                  // If EMS needs it, we can add `localStorage.setItem('ems_report', ...)` later via similar pattern
+                  // or pass via props if we refactor App state.
+                  // Assuming EMS might use a similar pattern or this is sufficient for now.
+                }
                 setCurrentView('dashboard');
               }}
             />

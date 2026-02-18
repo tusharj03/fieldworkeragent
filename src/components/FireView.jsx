@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MicrophoneButton } from './MicrophoneButton';
 import { ReportCard } from './ReportCard';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
@@ -22,61 +22,226 @@ export const FireView = ({ user }) => {
         const saved = localStorage.getItem('fire_report');
         return saved ? JSON.parse(saved) : null;
     });
+    // Transcript State Management
+    // ---------------------------
+    // Track the ID of the current in-progress report
+    const [currentReportId, setCurrentReportId] = useState(() => {
+        const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+        // Find ALL in-progress Fire reports
+        const inProgressReports = savedReports.filter(r => r.mode === 'FIRE' && r.status === 'in_progress');
+
+        if (inProgressReports.length === 0) return null;
+
+        // If multiple exist, sort by timestamp descending (newest first)
+        // Note: We use the first one as the source of truth, and will clean up others in the effect below
+        inProgressReports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        return inProgressReports[0].id;
+    });
+
+    // Effect: Consolidate duplicates on mount
+    // If multiple in-progress reports exist, keep only the latest one to prevent "forked" history
+    useEffect(() => {
+        if (currentReportId) {
+            const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+            const inProgressReports = savedReports.filter(r => r.mode === 'FIRE' && r.status === 'in_progress');
+
+            if (inProgressReports.length > 1) {
+                // Keep the one matching currentReportId (which we determined is the latest)
+                const validReport = savedReports.find(r => r.id === currentReportId);
+                const otherReports = savedReports.filter(r => r.id !== currentReportId && !(r.mode === 'FIRE' && r.status === 'in_progress'));
+
+                // Reconstruct reports list: Valid active report + All non-duplicate reports
+                const consolidatedReports = [validReport, ...otherReports].filter(Boolean);
+
+                localStorage.setItem('saved_reports', JSON.stringify(consolidatedReports));
+                console.log('Consolidated in-progress reports. Kept:', currentReportId);
+            }
+        }
+    }, [currentReportId]);
+
     const [persistedTranscript, setPersistedTranscript] = useState(() => {
         return localStorage.getItem('fire_transcript') || '';
     });
+
+    const [restoredTranscript, setRestoredTranscript] = useState(() => {
+        // Load transcript from the current in-progress history item if available
+        if (currentReportId) {
+            const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+            const report = savedReports.find(r => r.id === currentReportId);
+            return report ? report.transcript : '';
+        }
+        return '';
+    });
+
     const [error, setError] = useState(null);
+
+    // Combine restored text (from previous session) with live text (from current session)
+    const activeTranscript = [restoredTranscript, transcript].filter(Boolean).join(' ');
+
+    // Effect: Persist in-progress transcript to HISTORY
+    useEffect(() => {
+        if (!report && activeTranscript) {
+            const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+            const now = new Date().toISOString();
+
+            let updatedReports;
+
+            // If we have a current report ID, update that specific report
+            if (currentReportId) {
+                updatedReports = savedReports.map(r => {
+                    if (r.id === currentReportId) {
+                        return {
+                            ...r,
+                            transcript: activeTranscript,
+                            timestamp: now
+                            // Keep status as 'in_progress'
+                        };
+                    }
+                    return r;
+                });
+            } else {
+                // Otherwise, create a new one and set the ID
+                const newId = Date.now();
+                setCurrentReportId(newId); // Update state so subsequent saves update this one
+
+                const newReport = {
+                    id: newId,
+                    mode: 'FIRE',
+                    status: 'in_progress',
+                    transcript: activeTranscript,
+                    category: 'In Progress Incident',
+                    timestamp: now,
+                    userId: user.uid
+                };
+
+                updatedReports = [newReport, ...savedReports];
+            }
+
+            localStorage.setItem('saved_reports', JSON.stringify(updatedReports));
+        }
+    }, [activeTranscript, report, currentReportId, user.uid]);
+
+
+
+
+
+    // Combine restored text (from previous session) with live text (from current session)
+
+
+
+
+
+
 
     const handleToggleRecording = () => {
         if (isRecording) {
             handleStopAndAnalyze();
         } else {
+            // Start or Resume
             setError(null);
-            setReport(null);
-            setPersistedTranscript('');
-            localStorage.removeItem('fire_report');
-            localStorage.removeItem('fire_transcript');
-            clearTranscript();
+
+            // If we have a completed report, this is a "Start New" action
+            if (report) {
+                setReport(null);
+                setPersistedTranscript('');
+                setRestoredTranscript('');
+                setCurrentReportId(null);
+
+                localStorage.removeItem('fire_report');
+                localStorage.removeItem('fire_transcript');
+
+                clearTranscript();
+            }
             startRecording();
         }
+    };
+
+    const handleStartNew = () => {
+        // If there was an in-progress report, remove it from history as we are discarding it
+        if (currentReportId) {
+            const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+            const updatedReports = savedReports.filter(r => r.id !== currentReportId);
+            localStorage.setItem('saved_reports', JSON.stringify(updatedReports));
+        }
+
+        setReport(null);
+        setPersistedTranscript('');
+        setRestoredTranscript('');
+        setCurrentReportId(null);
+        setError(null);
+
+        localStorage.removeItem('fire_report');
+        localStorage.removeItem('fire_transcript');
+
+        clearTranscript();
+        startRecording();
     };
 
     const handleBack = () => {
         setReport(null);
         setPersistedTranscript('');
+        setRestoredTranscript('');
+        setCurrentReportId(null);
         setError(null);
+
         localStorage.removeItem('fire_report');
         localStorage.removeItem('fire_transcript');
+
         clearTranscript();
     };
 
     const handleStopAndAnalyze = async () => {
         stopRecording();
-        if (!transcript.trim()) {
+
+        // Use the combined transcript (restored + new) for analysis
+        if (!activeTranscript.trim()) {
             setError("No speech detected. Please try again.");
             return;
         }
 
         setIsAnalyzing(true);
         try {
-            const result = await RorkService.analyzeTranscript(transcript, 'FIRE');
+            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE');
+
+            // Use existing ID if available, else new one
+            const reportId = currentReportId || Math.floor(Date.now() % 10000);
 
             const reportWithMeta = {
                 ...result,
-                id: Math.floor(Date.now() % 10000),
+                id: reportId,
                 timestamp: new Date().toISOString(),
                 mode: 'FIRE',
-                userId: user.uid
+                userId: user.uid,
+                status: 'completed' // Mark as completed
             };
 
             setReport(reportWithMeta);
-            setPersistedTranscript(transcript);
+            setPersistedTranscript(activeTranscript);
 
+            // Update local storage for active report view
             localStorage.setItem('fire_report', JSON.stringify(reportWithMeta));
-            localStorage.setItem('fire_transcript', transcript);
+            localStorage.setItem('fire_transcript', activeTranscript);
 
+            // Update the history item to COMPLETED
             const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
-            localStorage.setItem('saved_reports', JSON.stringify([reportWithMeta, ...savedReports]));
+            let updatedReports;
+
+            if (currentReportId) {
+                updatedReports = savedReports.map(r => {
+                    if (r.id === currentReportId) {
+                        return {
+                            ...reportWithMeta,
+                            status: 'completed'
+                        };
+                    }
+                    return r;
+                });
+            } else {
+                updatedReports = [reportWithMeta, ...savedReports];
+            }
+
+            localStorage.setItem('saved_reports', JSON.stringify(updatedReports));
 
         } catch (err) {
             console.error(err);
@@ -87,8 +252,8 @@ export const FireView = ({ user }) => {
     };
 
     // Use the persisted transcript if we have a report (for correct display after reload)
-    // Otherwise use the live transcript from the hook
-    const displayTranscript = report ? persistedTranscript : transcript;
+    // Otherwise use the active (restored + live) transcript
+    const displayTranscript = report ? persistedTranscript : activeTranscript;
 
     return (
         <>
@@ -112,11 +277,23 @@ export const FireView = ({ user }) => {
                 {!report && !isAnalyzing && (
                     <div className="text-center py-12 animate-fade-in">
                         <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 text-glow">
-                            Ready to Report?
+                            {displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?'}
                         </h2>
                         <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
-                            Tap the microphone to start recording your incident report.
+                            {displayTranscript
+                                ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
+                                : 'Tap the microphone to start recording your incident report.'}
                         </p>
+
+                        {/* Start Over Option (Only if we have content but aren't recording) */}
+                        {displayTranscript && !isRecording && (
+                            <button
+                                onClick={handleStartNew}
+                                className="mt-6 text-sm text-red-400 hover:text-red-300 underline decoration-red-500/30 hover:decoration-red-400 underline-offset-4 transition-all"
+                            >
+                                Discard & Start New Report
+                            </button>
+                        )}
                     </div>
                 )}
 
