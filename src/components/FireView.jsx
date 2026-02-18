@@ -4,7 +4,7 @@ import { ReportCard } from './ReportCard';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { RorkService } from '../services/rork';
 import { PdfService } from '../services/pdf';
-import { Activity, AlertCircle } from 'lucide-react';
+import { Activity, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export const FireView = ({ user }) => {
     const {
@@ -18,7 +18,13 @@ export const FireView = ({ user }) => {
     } = useVoiceRecognition();
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [report, setReport] = useState(null);
+    const [report, setReport] = useState(() => {
+        const saved = localStorage.getItem('fire_report');
+        return saved ? JSON.parse(saved) : null;
+    });
+    const [persistedTranscript, setPersistedTranscript] = useState(() => {
+        return localStorage.getItem('fire_transcript') || '';
+    });
     const [error, setError] = useState(null);
 
     const handleToggleRecording = () => {
@@ -27,9 +33,21 @@ export const FireView = ({ user }) => {
         } else {
             setError(null);
             setReport(null);
+            setPersistedTranscript('');
+            localStorage.removeItem('fire_report');
+            localStorage.removeItem('fire_transcript');
             clearTranscript();
             startRecording();
         }
+    };
+
+    const handleBack = () => {
+        setReport(null);
+        setPersistedTranscript('');
+        setError(null);
+        localStorage.removeItem('fire_report');
+        localStorage.removeItem('fire_transcript');
+        clearTranscript();
     };
 
     const handleStopAndAnalyze = async () => {
@@ -52,6 +70,10 @@ export const FireView = ({ user }) => {
             };
 
             setReport(reportWithMeta);
+            setPersistedTranscript(transcript);
+
+            localStorage.setItem('fire_report', JSON.stringify(reportWithMeta));
+            localStorage.setItem('fire_transcript', transcript);
 
             const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
             localStorage.setItem('saved_reports', JSON.stringify([reportWithMeta, ...savedReports]));
@@ -64,9 +86,28 @@ export const FireView = ({ user }) => {
         }
     };
 
+    // Use the persisted transcript if we have a report (for correct display after reload)
+    // Otherwise use the live transcript from the hook
+    const displayTranscript = report ? persistedTranscript : transcript;
+
     return (
         <>
-            <div className="max-w-4xl mx-auto space-y-8">
+            <div className="max-w-4xl mx-auto space-y-8 relative">
+                {/* Back Button for Report View */}
+                {report && !isAnalyzing && (
+                    <div className="absolute -top-12 left-0 z-10">
+                        <button
+                            onClick={handleBack}
+                            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group px-3 py-2 rounded-lg hover:bg-white/5"
+                        >
+                            <div className="p-1 rounded-full bg-slate-800/50 group-hover:bg-slate-700 transition-colors">
+                                <ArrowLeft size={16} />
+                            </div>
+                            <span className="font-medium">Back to Start</span>
+                        </button>
+                    </div>
+                )}
+
                 {/* Welcome / Status */}
                 {!report && !isAnalyzing && (
                     <div className="text-center py-12 animate-fade-in">
@@ -82,14 +123,16 @@ export const FireView = ({ user }) => {
                 {/* Transcript Area */}
                 <div className={`
           glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500
-          ${transcript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
+          ${displayTranscript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
         `}>
                     <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Transcript</span>
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            {report ? 'Report Transcript' : 'Live Transcript'}
+                        </span>
                         {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                     </div>
                     <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                        {transcript}
+                        {displayTranscript}
                     </p>
                 </div>
 
@@ -119,7 +162,7 @@ export const FireView = ({ user }) => {
                         <ReportCard
                             report={report}
                             audioUrl={audioUrl}
-                            onExport={() => PdfService.generateReport(report, transcript)}
+                            onExport={() => PdfService.generateReport(report, displayTranscript)}
                         />
                     </div>
                 )}
