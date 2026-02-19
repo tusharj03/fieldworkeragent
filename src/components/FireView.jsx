@@ -422,6 +422,26 @@ export const FireView = ({ user }) => {
                             report={report}
                             audioUrl={audioUrl}
                             onExport={() => PdfService.generateReport(report, displayTranscript)}
+                            onActionComplete={(completedItem) => {
+                                // 1. Remove from action_items
+                                // 2. Add to actions_taken
+                                // 3. Persist
+                                const updatedReport = {
+                                    ...report,
+                                    action_items: report.action_items.filter(i => i !== completedItem),
+                                    actions_taken: [...(report.actions_taken || []), completedItem]
+                                };
+
+                                setReport(updatedReport);
+                                localStorage.setItem('fire_report', JSON.stringify(updatedReport));
+
+                                // Persist to history
+                                const savedReports = JSON.parse(localStorage.getItem('saved_reports') || '[]');
+                                const updatedHistory = savedReports.map(r =>
+                                    (r.id === report.id || r.id === currentReportId) ? { ...updatedReport, status: 'completed' } : r
+                                );
+                                localStorage.setItem('saved_reports', JSON.stringify(updatedHistory));
+                            }}
                         />
                     </div>
                 )}

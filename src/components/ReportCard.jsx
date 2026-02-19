@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic } from 'lucide-react';
 import { VitalsChart } from './VitalsChart';
 
-export function ReportCard({ report, onExport, audioUrl }) {
+export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
     if (!report) return null;
 
     const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
@@ -352,9 +352,26 @@ export function ReportCard({ report, onExport, audioUrl }) {
                                 </h4>
                                 <ul className="space-y-2">
                                     {report.action_items.map((item, i) => (
-                                        <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300 group">
-                                            <div className="w-4 h-4 rounded border border-slate-600 mt-0.5 shrink-0 group-hover:border-orange-500 transition-colors" />
-                                            <span className="group-hover:text-slate-100 transition-colors">{item}</span>
+                                        <li key={i} className="group">
+                                            <button
+                                                onClick={() => onActionComplete && onActionComplete(item)}
+                                                className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 p-2 -ml-2 rounded-lg' : ''}`}
+                                                disabled={!onActionComplete}
+                                            >
+                                                <div className={`
+                                                    w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all
+                                                    ${onActionComplete
+                                                        ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20'
+                                                        : 'border-slate-600'}
+                                                `}>
+                                                    {onActionComplete && (
+                                                        <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                                <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>
+                                                    {item}
+                                                </span>
+                                            </button>
                                         </li>
                                     ))}
                                 </ul>
