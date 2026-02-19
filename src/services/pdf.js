@@ -253,6 +253,21 @@ export const PdfService = {
                 finalY = doc.lastAutoTable.finalY + 10;
             }
 
+            // 6b. Field Notes
+            if (report.notes && report.notes.length > 0) {
+                const notesBody = report.notes.map((n, i) => [`${i + 1}.  "${n}"`]);
+                autoTable(doc, {
+                    startY: finalY,
+                    head: [['FIELD NOTES']],
+                    body: notesBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: [234, 179, 8], textColor: 255, fontStyle: 'bold' }, // Yellow-500
+                    bodyStyles: { textColor: theme.text.dark, fontStyle: 'italic', fillColor: [254, 252, 232] }, // Yellow-50
+                    margin: { left: margin, right: margin }
+                });
+                finalY = doc.lastAutoTable.finalY + 10;
+            }
+
             // 7. Transcript
             if (transcript) {
                 autoTable(doc, {

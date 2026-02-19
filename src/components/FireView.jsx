@@ -5,7 +5,7 @@ import { FireActionItems } from './FireActionItems';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { RorkService } from '../services/rork';
 import { PdfService } from '../services/pdf';
-import { Activity, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Activity, AlertCircle, ArrowLeft, StickyNote } from 'lucide-react';
 
 export const FireView = ({ user }) => {
     const {
@@ -25,6 +25,7 @@ export const FireView = ({ user }) => {
     });
 
     const [actionItems, setActionItems] = useState([]);
+    const [notes, setNotes] = useState([]);
     // Transcript State Management
     // ---------------------------
     // Track the ID of the current in-progress report
@@ -134,6 +135,94 @@ export const FireView = ({ user }) => {
         actionItemsRef.current = actionItems;
     }, [activeTranscript, actionItems]);
 
+    // Extract "Note to Self" items
+    useEffect(() => {
+        if (!activeTranscript) return;
+
+        // Phrases that trigger a note
+        // Case insensitive matching
+        const triggerPhrases = [
+            "note to self",
+            "take a note",
+            "important note",
+            "make a note"
+        ];
+
+        // We want to find all instances of these phrases and capture the text after them
+        // until the end of the sentence or the next trigger phrase.
+        // Simple heuristic: Text after trigger until '.' or '?' or newline
+
+        const extractedNotes = [];
+        const lowerTranscript = activeTranscript.toLowerCase();
+
+        let lastIndex = 0;
+
+        // Find all occurrences
+        // This is a basic implementation - for production, might want more robust NLP or regex
+        // We will scan the whole transcript to rebuild the notes list to avoid duplicates/state desync
+
+        // Helper to find the first occurring trigger after a certain index
+        const findNextTrigger = (startIndex) => {
+            let nextTrigger = null;
+            let minIndex = Infinity;
+
+            triggerPhrases.forEach(phrase => {
+                const idx = lowerTranscript.indexOf(phrase, startIndex);
+                if (idx !== -1 && idx < minIndex) {
+                    minIndex = idx;
+                    nextTrigger = phrase;
+                }
+            });
+
+            return nextTrigger ? { phrase: nextTrigger, index: minIndex } : null;
+        };
+
+        let currentSearchIdx = 0;
+        while (currentSearchIdx < lowerTranscript.length) {
+            const match = findNextTrigger(currentSearchIdx);
+            if (!match) break;
+
+            // Found a trigger
+            const startOfNote = match.index + match.phrase.length;
+
+            // Find end of note (next punctuation or next trigger)
+            const nextTriggerMatch = findNextTrigger(startOfNote);
+            const nextPeriod = lowerTranscript.indexOf('.', startOfNote);
+            const nextQuestion = lowerTranscript.indexOf('?', startOfNote);
+
+            // Determine end index
+            let endOfNote = lowerTranscript.length;
+
+            if (nextTriggerMatch && nextTriggerMatch.index < endOfNote) {
+                endOfNote = nextTriggerMatch.index;
+            }
+            // Punctuation usually creates a cleaner note than running until the next trigger
+            if (nextPeriod !== -1 && nextPeriod < endOfNote) {
+                endOfNote = nextPeriod + 1; // Include period
+            }
+            if (nextQuestion !== -1 && nextQuestion < endOfNote) {
+                endOfNote = nextQuestion + 1;
+            }
+
+            const noteContent = activeTranscript.substring(startOfNote, endOfNote).trim();
+            // Only add if meaningful content
+            if (noteContent && noteContent.length > 3) {
+                // Check if it's already in our extracted list (dedupe within this loop)
+                if (!extractedNotes.includes(noteContent)) {
+                    extractedNotes.push(noteContent);
+                }
+            }
+
+            currentSearchIdx = endOfNote;
+        }
+
+        // Update state if different
+        if (JSON.stringify(extractedNotes) !== JSON.stringify(notes)) {
+            setNotes(extractedNotes);
+        }
+
+    }, [activeTranscript]);
+
     // Poll for Action Items Updates
     useEffect(() => {
         if (!isRecording) return;
@@ -180,6 +269,7 @@ export const FireView = ({ user }) => {
             // Reset action items on new recording start
             setActionItems([]);
             setManualEvents([]);
+            setNotes([]);
         }
     };
 
@@ -201,6 +291,8 @@ export const FireView = ({ user }) => {
         localStorage.removeItem('fire_transcript');
 
         clearTranscript();
+        clearTranscript();
+        setNotes([]);
         startRecording();
     };
 
@@ -215,6 +307,7 @@ export const FireView = ({ user }) => {
         localStorage.removeItem('fire_transcript');
 
         clearTranscript();
+        setNotes([]);
     };
 
     const handleStopAndAnalyze = async () => {
@@ -239,6 +332,7 @@ export const FireView = ({ user }) => {
                 timestamp: new Date().toISOString(),
                 mode: 'FIRE',
                 userId: user.uid,
+                notes: notes, // Include extracted notes
                 status: 'completed' // Mark as completed
             };
 
@@ -389,6 +483,24 @@ export const FireView = ({ user }) => {
                                     items={actionItems}
                                     onToggle={handleToggleActionItem}
                                 />
+                            </div>
+                        )}
+
+                        {/* Live Notes Column - Only show if there are notes */}
+                        {notes.length > 0 && (
+                            <div className="lg:col-span-3 animate-slide-up">
+                                <div className="glass-panel p-5 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
+                                    <h3 className="text-yellow-400 font-bold uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
+                                        <StickyNote size={14} /> Live Field Notes
+                                    </h3>
+                                    <div className="grid md:grid-cols-2 gap-3">
+                                        {notes.map((note, idx) => (
+                                            <div key={idx} className="bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/10 text-yellow-100 text-sm">
+                                                "{note}"
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
