@@ -123,8 +123,8 @@ export const RorkService = {
             "List specific NERIS Primary and Additional Actions (e.g., 'Fire Control', 'Search & Rescue', 'Ventilation')"
         ],
         "neris_data": {
-            "incident_type": "Likely NERIS incident type code/description",
-            "property_use": "Likely NERIS property use code/description",
+            "incident_type": "Likely NERIS incident type description",
+            "property_use": "Likely NERIS property use description",
             "entities_involved": ["List people/agencies involved"],
             "stabilization_status": "Controlled | Uncontrolled | Under Investigation"
         },

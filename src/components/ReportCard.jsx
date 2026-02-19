@@ -282,25 +282,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 </Section>
             )}
 
-            {/* FIRE: NFIRS Mapping */}
-            {isFireMode && report.nfirs_mapping && (
-                <Section title="NFIRS Codes" icon={Layers}>
-                    <div className="grid md:grid-cols-3 gap-4">
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                            <span className="text-xs text-slate-500 uppercase block mb-1">Incident Type</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.incident_type}</span>
-                        </div>
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                            <span className="text-xs text-slate-500 uppercase block mb-1">Property Use</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.property_use}</span>
-                        </div>
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                            <span className="text-xs text-slate-500 uppercase block mb-1">Cause / Ignition</span>
-                            <span className="text-lg font-mono font-bold text-white">{report.nfirs_mapping.cause}</span>
-                        </div>
-                    </div>
-                </Section>
-            )}
+
 
             {/* EMS: Assessment */}
             {!isFireMode && (
