@@ -179,6 +179,7 @@ export const FireView = ({ user }) => {
             startRecording();
             // Reset action items on new recording start
             setActionItems([]);
+            setManualEvents([]);
         }
     };
 
@@ -227,7 +228,7 @@ export const FireView = ({ user }) => {
 
         setIsAnalyzing(true);
         try {
-            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE');
+            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE', null, manualEvents);
 
             // Use existing ID if available, else new one
             const reportId = currentReportId || Math.floor(Date.now() % 10000);
@@ -240,6 +241,26 @@ export const FireView = ({ user }) => {
                 userId: user.uid,
                 status: 'completed' // Mark as completed
             };
+
+            // FORCE MERGE MANUAL EVENTS INTO TIMELINE
+            // The AI is instructed to do this, but sometimes fails. We do it manually to be 100% sure.
+            if (manualEvents && manualEvents.length > 0) {
+                const existingTimeline = reportWithMeta.timeline || [];
+
+                // Convert manual events to timeline format
+                const manualTimelineEvents = manualEvents.map(e => ({
+                    time: e.time,
+                    event: e.description
+                }));
+
+                // Combine and sort by time
+                const combinedTimeline = [...existingTimeline, ...manualTimelineEvents].sort((a, b) => {
+                    // Simple time comparison HH:MM
+                    return a.time.localeCompare(b.time);
+                });
+
+                reportWithMeta.timeline = combinedTimeline;
+            }
 
             setReport(reportWithMeta);
             setPersistedTranscript(activeTranscript);
@@ -280,12 +301,24 @@ export const FireView = ({ user }) => {
     // Otherwise use the active (restored + live) transcript
     const displayTranscript = report ? persistedTranscript : activeTranscript;
 
+    const [manualEvents, setManualEvents] = useState([]);
+
     const handleToggleActionItem = (itemId) => {
-        setActionItems(prev => prev.map(item =>
-            item.id === itemId
-                ? { ...item, isCompleted: !item.isCompleted }
-                : item
-        ));
+        setActionItems(prev => prev.map(item => {
+            if (item.id === itemId) {
+                const newStatus = !item.isCompleted;
+                // Record the event if it's being marked as completed
+                if (newStatus) {
+                    const event = {
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        description: `Action Completed: ${item.text}`
+                    };
+                    setManualEvents(prevEvents => [...prevEvents, event]);
+                }
+                return { ...item, isCompleted: newStatus };
+            }
+            return item;
+        }));
     };
 
     return (

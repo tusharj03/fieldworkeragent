@@ -83,16 +83,26 @@ export const RorkService = {
   /**
    * Analyzes the transcript to generate a structured report.
  * @param {string} transcript - The text transcript from voice recognition.
- * @param {string} mode - 'EMS' or 'FIRE'.
- * @returns {Promise<object>} - The structured analysis result.
- */
-  async analyzeTranscript(transcript, mode = 'EMS', template = null) {
+   * @param {string} mode - 'EMS' or 'FIRE'.
+   * @param {object} template - Optional template.
+   * @param {Array} additionalEvents - Optional array of manual events {time, description}.
+   * @returns {Promise<object>} - The structured analysis result.
+   */
+  async analyzeTranscript(transcript, mode = 'EMS', template = null, additionalEvents = []) {
     let systemPrompt;
 
     if (mode === 'FIRE') {
+      const eventsContext = additionalEvents.length > 0
+        ? `\n\nMANUAL LOGGED EVENTS (Must be included in timeline):\n${JSON.stringify(additionalEvents, null, 2)}`
+        : '';
+
+      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
       systemPrompt = `You are an expert Fire/Rescue reporting assistant using the NERIS (National Emergency Response Information System) standard.
       Your job is to listen to the firefighter's transcript and extract technical data for incident reporting.
+      Current System Time: ${currentTime}
       ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
+      ${eventsContext}
       
       Return a JSON object with this EXACT structure:
       {
