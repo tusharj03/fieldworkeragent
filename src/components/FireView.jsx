@@ -189,6 +189,7 @@ export const FireView = ({ user }) => {
             const nextTriggerMatch = findNextTrigger(startOfNote);
             const nextPeriod = lowerTranscript.indexOf('.', startOfNote);
             const nextQuestion = lowerTranscript.indexOf('?', startOfNote);
+            const nextPause = lowerTranscript.indexOf('[pause]', startOfNote); // NEW: Look for pause marker
 
             // Determine end index
             let endOfNote = lowerTranscript.length;
@@ -196,15 +197,23 @@ export const FireView = ({ user }) => {
             if (nextTriggerMatch && nextTriggerMatch.index < endOfNote) {
                 endOfNote = nextTriggerMatch.index;
             }
-            // Punctuation usually creates a cleaner note than running until the next trigger
-            if (nextPeriod !== -1 && nextPeriod < endOfNote) {
-                endOfNote = nextPeriod + 1; // Include period
-            }
-            if (nextQuestion !== -1 && nextQuestion < endOfNote) {
-                endOfNote = nextQuestion + 1;
+            // First valid terminator wins
+            const possibleEnds = [nextPeriod, nextQuestion, nextPause].filter(idx => idx !== -1);
+            if (possibleEnds.length > 0) {
+                const earliestEnd = Math.min(...possibleEnds);
+                if (earliestEnd < endOfNote) {
+                    // Include the punctuation if it was period/question, but not if it was [pause]
+                    // If it's a pause, we take up to the pause start
+                    endOfNote = earliestEnd;
+                    if (earliestEnd === nextPeriod || earliestEnd === nextQuestion) {
+                        endOfNote += 1;
+                    }
+                }
             }
 
-            const noteContent = activeTranscript.substring(startOfNote, endOfNote).trim();
+            // Remove the [pause] marker from the extracted note string itself just in case
+            let noteContent = activeTranscript.substring(startOfNote, endOfNote).replace(/\[PAUSE\]/gi, '').trim();
+
             // Only add if meaningful content
             if (noteContent && noteContent.length > 3) {
                 // Check if it's already in our extracted list (dedupe within this loop)
@@ -332,7 +341,6 @@ export const FireView = ({ user }) => {
                 timestamp: new Date().toISOString(),
                 mode: 'FIRE',
                 userId: user.uid,
-                notes: notes, // Include extracted notes
                 status: 'completed' // Mark as completed
             };
 
@@ -393,7 +401,9 @@ export const FireView = ({ user }) => {
 
     // Use the persisted transcript if we have a report (for correct display after reload)
     // Otherwise use the active (restored + live) transcript
-    const displayTranscript = report ? persistedTranscript : activeTranscript;
+    // Strip [PAUSE] markers before rendering so the user never sees them
+    const rawTranscript = report ? persistedTranscript : activeTranscript;
+    const displayTranscript = rawTranscript.replace(/\[PAUSE\]/g, '');
 
     const [manualEvents, setManualEvents] = useState([]);
 

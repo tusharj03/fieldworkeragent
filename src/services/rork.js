@@ -131,7 +131,8 @@ export const RorkService = {
         "hazards": [
              "List safety hazards (e.g., 'Collapse risk', 'Live wires', 'Flashover potential')"
         ],
-        "action_items": ["Follow-up items for investigator or safety officer"]
+        "action_items": ["Follow-up items for investigator or safety officer"],
+        "notes": ["Extract ANY explicit 'notes to self', 'make a note', or specific observations the user wanted recorded verbatim"]
       }
 
       Use 'N/A' for missing fields. Infer times if relative times are given (assume start is now - duration).
@@ -182,7 +183,8 @@ export const RorkService = {
         "billing_codes": {
              "icd10": "Suspected code",
              "cpt": "Service codes"
-        }
+        },
+        "notes": ["Extract ANY explicit 'notes to self', 'make a note', or specific observations the user wanted recorded verbatim"]
       }
       
       If the transcript is empty or unclear, return a polite error message in the summary.`;

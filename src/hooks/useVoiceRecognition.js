@@ -11,6 +11,7 @@ export const useVoiceRecognition = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const isListeningDesired = useRef(false); // Track if user WANTS to be recording
+  const silenceTimerRef = useRef(null);
 
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -41,6 +42,26 @@ export const useVoiceRecognition = () => {
         setFinalTranscript(prev => prev + (prev ? ' ' : '') + newFinal);
       }
       setInterimTranscript(newInterim);
+
+      // --- SILENCE DETECTION LOGIC ---
+      // Clear any existing timer because we just received speech
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+
+      // We only want to insert a pause if there isn't actively interim speech
+      // AND we have some final transcript to attach it to.
+      if (!newInterim) {
+        silenceTimerRef.current = setTimeout(() => {
+          setFinalTranscript(prev => {
+            // Prevent duplicate pauses back-to-back
+            if (prev && !prev.endsWith(' [PAUSE]')) {
+              return prev + ' [PAUSE]';
+            }
+            return prev;
+          });
+        }, 3000); // 3 seconds of silence
+      }
     };
 
     recognition.onerror = (event) => {
