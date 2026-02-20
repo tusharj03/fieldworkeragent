@@ -148,6 +148,13 @@ export const FireView = ({ user }) => {
             "make a note"
         ];
 
+        const endPhrases = [
+            "end note",
+            "end of note",
+            "close note",
+            "that's it"
+        ];
+
         // We want to find all instances of these phrases and capture the text after them
         // until the end of the sentence or the next trigger phrase.
         // Simple heuristic: Text after trigger until '.' or '?' or newline
@@ -177,6 +184,21 @@ export const FireView = ({ user }) => {
             return nextTrigger ? { phrase: nextTrigger, index: minIndex } : null;
         };
 
+        const findNextEndPhrase = (startIndex) => {
+            let nextEnd = null;
+            let minIndex = Infinity;
+
+            endPhrases.forEach(phrase => {
+                const idx = lowerTranscript.indexOf(phrase, startIndex);
+                if (idx !== -1 && idx < minIndex) {
+                    minIndex = idx;
+                    nextEnd = phrase;
+                }
+            });
+
+            return nextEnd ? { phrase: nextEnd, index: minIndex } : null;
+        };
+
         let currentSearchIdx = 0;
         while (currentSearchIdx < lowerTranscript.length) {
             const match = findNextTrigger(currentSearchIdx);
@@ -187,6 +209,7 @@ export const FireView = ({ user }) => {
 
             // Find end of note (next punctuation or next trigger)
             const nextTriggerMatch = findNextTrigger(startOfNote);
+            const nextEndPhraseMatch = findNextEndPhrase(startOfNote);
             const nextPeriod = lowerTranscript.indexOf('.', startOfNote);
             const nextQuestion = lowerTranscript.indexOf('?', startOfNote);
             const nextPause = lowerTranscript.indexOf('[pause]', startOfNote); // NEW: Look for pause marker
@@ -198,7 +221,8 @@ export const FireView = ({ user }) => {
                 endOfNote = nextTriggerMatch.index;
             }
             // First valid terminator wins
-            const possibleEnds = [nextPeriod, nextQuestion, nextPause].filter(idx => idx !== -1);
+            const nextEndPhraseIdx = nextEndPhraseMatch ? nextEndPhraseMatch.index : -1;
+            const possibleEnds = [nextPeriod, nextQuestion, nextPause, nextEndPhraseIdx].filter(idx => idx !== -1);
             if (possibleEnds.length > 0) {
                 const earliestEnd = Math.min(...possibleEnds);
                 if (earliestEnd < endOfNote) {

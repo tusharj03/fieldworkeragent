@@ -60,7 +60,7 @@ export const useVoiceRecognition = () => {
             }
             return prev;
           });
-        }, 3000); // 3 seconds of silence
+        }, 5000); // 5 seconds of silence
       }
     };
 
