@@ -8,6 +8,13 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
     const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
     const isMVA = report.category?.toLowerCase() === 'mva';
 
+    // Helper to extract just the description if the AI accidentally includes the number
+    // E.g. "111 - Building Fire" -> "Building Fire"
+    const stripNerisCode = (text) => {
+        if (!text) return 'N/A';
+        return text.replace(/^[\d\s-:]+/, '').trim();
+    };
+
     const getUrgencyColor = (urgency) => {
         switch (urgency?.toLowerCase()) {
             case 'high': return 'text-red-400 bg-red-500/10 border-red-500/20';
@@ -434,6 +441,29 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                     )}
                 </div>
             </Section>
+
+            {/* NERIS Classifications (Displayed as text descriptions) */}
+            {isFireMode && report.neris_data && (
+                <div className="pt-6 border-t border-white/5 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                        <Layers size={14} className="text-purple-400" /> NERIS Classifications
+                    </h4>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex flex-col justify-center group hover:border-purple-500/30 transition-colors">
+                            <span className="text-xs text-slate-500 font-medium mb-1">Incident Type</span>
+                            <span className="text-sm font-medium text-slate-300 leading-tight">
+                                {stripNerisCode(report.neris_data.incident_type)}
+                            </span>
+                        </div>
+                        <div className="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex flex-col justify-center group hover:border-purple-500/30 transition-colors">
+                            <span className="text-xs text-slate-500 font-medium mb-1">Property Use</span>
+                            <span className="text-sm font-medium text-slate-300 leading-tight">
+                                {stripNerisCode(report.neris_data.property_use)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Actions Footer */}
 

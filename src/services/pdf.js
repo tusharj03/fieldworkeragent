@@ -15,8 +15,13 @@ export const PdfService = {
             const width = doc.internal.pageSize.getWidth();
             const height = doc.internal.pageSize.getHeight();
 
+            const stripNerisCode = (text) => {
+                if (!text) return 'N/A';
+                return text.replace(/^[\d\s-:]+/, '').trim();
+            };
+
             // --- THEME CONFIG ---
-            const isFire = report.mode === 'FIRE' || report.neris_data;
+            const isFire = report.mode === 'FIRE' || report.nfirs_mapping;
 
             // Professional Color Palette
             const theme = {
@@ -155,12 +160,6 @@ export const PdfService = {
                     domainTitle = "MOTOR VEHICLE ACCIDENT DETAILS";
                 } else {
                     domainTitle = "FIRE INCIDENT DETAILS";
-                }
-
-                if (report.neris_data) {
-                    domainBody.push(['NERIS Type', report.neris_data.incident_type || '-']);
-                    domainBody.push(['Property', report.neris_data.property_use || '-']);
-                    domainBody.push(['Status', report.neris_data.stabilization_status || '-']);
                 }
 
                 if (isMVA && report.mva_info) {
