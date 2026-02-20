@@ -110,11 +110,16 @@ export const RorkService = {
         "category": "Structure Fire | Wildland | Hazmat | MVA | Rescue | Alarm",
         "urgency": "High | Medium | Low",
         "scene_info": {
-            "type": "e.g., Residential, Commercial, Mixed Use",
-            "building": "e.g., 2-story wood frame, 5-story brick",
-            "smoke_conditions": "Description of smoke color/volume/velocity",
-            "flame_conditions": "Description of visible fire location/extent",
-            "exposures": "Any threatened structures (Side A, B, C, D)"
+            "type": "e.g., Residential, Commercial, Mixed Use (If not MVA)",
+            "building": "e.g., 2-story wood frame, 5-story brick (If not MVA)",
+            "smoke_conditions": "Description of smoke color/volume/velocity (If not MVA)",
+            "flame_conditions": "Description of visible fire location/extent (If not MVA)",
+            "exposures": "Any threatened structures (Side A, B, C, D) (If not MVA)"
+        },
+        "mva_info": {
+            "vehicles_involved": "Number and type of vehicles, e.g. '2 vehicles (Sedan and SUV)' (If MVA)",
+            "extrication": "Required? Yes/No, and details e.g. 'Driver door removed' (If MVA)",
+            "traffic_conditions": "Impact on traffic, e.g. 'All lanes blocked' (If MVA)"
         },
         "timeline": [
             { "time": "HH:MM", "event": "Brief description" } 

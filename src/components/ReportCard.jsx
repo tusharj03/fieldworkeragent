@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic } from 'lucide-react';
+import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car } from 'lucide-react';
 import { VitalsChart } from './VitalsChart';
 
 export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
     if (!report) return null;
 
     const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
+    const isMVA = report.category?.toLowerCase() === 'mva';
 
     const getUrgencyColor = (urgency) => {
         switch (urgency?.toLowerCase()) {
@@ -79,8 +80,8 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 </div>
             </div>
 
-            {/* FIRE: Scene Info */}
-            {isFireMode && report.scene_info && (
+            {/* FIRE: Scene Info (Structures/Wildland) */}
+            {isFireMode && !isMVA && report.scene_info && (
                 <div className="grid md:grid-cols-2 gap-4">
                     <div className="glass-panel rounded-xl p-5">
                         <h4 className="text-red-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
@@ -114,6 +115,29 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                                 <span className="text-slate-400">Flames</span>
                                 <span className="font-medium text-slate-200">{report.scene_info.flame_conditions}</span>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* FIRE: MVA Info */}
+            {isFireMode && isMVA && report.mva_info && (
+                <div className="glass-panel rounded-xl p-5">
+                    <h4 className="text-blue-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                        <Car size={14} /> Motor Vehicle Accident Details
+                    </h4>
+                    <div className="grid md:grid-cols-3 gap-6">
+                        <div className="space-y-1">
+                            <span className="text-xs font-bold text-slate-500 uppercase">Vehicles Involved</span>
+                            <p className="font-medium text-slate-200 text-sm">{report.mva_info.vehicles_involved}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <span className="text-xs font-bold text-slate-500 uppercase">Extrication Required</span>
+                            <p className="font-medium text-slate-200 text-sm">{report.mva_info.extrication}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <span className="text-xs font-bold text-slate-500 uppercase">Traffic Impact</span>
+                            <p className="font-medium text-slate-200 text-sm">{report.mva_info.traffic_conditions}</p>
                         </div>
                     </div>
                 </div>

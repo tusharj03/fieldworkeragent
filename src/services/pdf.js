@@ -148,21 +148,33 @@ export const PdfService = {
             // 4. Domain Specific Details
             let domainBody = [];
             let domainTitle = "";
+            const isMVA = report.category?.toLowerCase() === 'mva';
 
             if (isFire) {
-                domainTitle = "FIRE INCIDENT DETAILS";
+                if (isMVA) {
+                    domainTitle = "MOTOR VEHICLE ACCIDENT DETAILS";
+                } else {
+                    domainTitle = "FIRE INCIDENT DETAILS";
+                }
+
                 if (report.neris_data) {
                     domainBody.push(['NERIS Type', report.neris_data.incident_type || '-']);
                     domainBody.push(['Property', report.neris_data.property_use || '-']);
                     domainBody.push(['Status', report.neris_data.stabilization_status || '-']);
                 }
-                if (report.scene_info) {
+
+                if (isMVA && report.mva_info) {
+                    domainBody.push(['Vehicles', report.mva_info.vehicles_involved || '-']);
+                    domainBody.push(['Extrication', report.mva_info.extrication || '-']);
+                    domainBody.push(['Traffic Impact', report.mva_info.traffic_conditions || '-']);
+                } else if (!isMVA && report.scene_info) {
                     domainBody.push(['Building', report.scene_info.building || '-']);
                     domainBody.push(['Construction', report.scene_info.type || '-']);
                     domainBody.push(['Smoke', report.scene_info.smoke_conditions || '-']);
                     domainBody.push(['Fire', report.scene_info.flame_conditions || '-']);
                     domainBody.push(['Hazards', report.scene_info.exposures || 'None']);
                 }
+
             } else {
                 domainTitle = "PATIENT DEMOGRAPHICS";
                 if (report.patient_info) {
