@@ -335,34 +335,37 @@ export const FireView = ({ user }) => {
             // Use existing ID if available, else new one
             const reportId = currentReportId || Math.floor(Date.now() % 10000);
 
+            // 1. MERGE MANUAL EVENTS INTO TIMELINE
+            if (manualEvents && manualEvents.length > 0) {
+                const existingTimeline = result.timeline || [];
+                const manualTimelineEvents = manualEvents.map(e => ({
+                    time: e.time,
+                    event: e.description
+                }));
+                const combinedTimeline = [...existingTimeline, ...manualTimelineEvents].sort((a, b) => {
+                    return a.time.localeCompare(b.time);
+                });
+                result.timeline = combinedTimeline;
+            }
+
+            // 2. MERGE LIVE CHECKLIST ITEMS
+            const liveUncompleted = actionItemsRef.current.filter(item => !item.isCompleted).map(item => item.text);
+            const liveCompleted = actionItemsRef.current.filter(item => item.isCompleted).map(item => item.text);
+
+            const aiActionItems = result.action_items || [];
+            const mergedActionItems = [...new Set([...liveUncompleted, ...aiActionItems])];
+            const mergedActionsTaken = [...new Set([...(result.actions_taken || []), ...liveCompleted])];
+
             const reportWithMeta = {
                 ...result,
+                action_items: mergedActionItems,
+                actions_taken: mergedActionsTaken,
                 id: reportId,
                 timestamp: new Date().toISOString(),
                 mode: 'FIRE',
                 userId: user.uid,
                 status: 'completed' // Mark as completed
             };
-
-            // FORCE MERGE MANUAL EVENTS INTO TIMELINE
-            // The AI is instructed to do this, but sometimes fails. We do it manually to be 100% sure.
-            if (manualEvents && manualEvents.length > 0) {
-                const existingTimeline = reportWithMeta.timeline || [];
-
-                // Convert manual events to timeline format
-                const manualTimelineEvents = manualEvents.map(e => ({
-                    time: e.time,
-                    event: e.description
-                }));
-
-                // Combine and sort by time
-                const combinedTimeline = [...existingTimeline, ...manualTimelineEvents].sort((a, b) => {
-                    // Simple time comparison HH:MM
-                    return a.time.localeCompare(b.time);
-                });
-
-                reportWithMeta.timeline = combinedTimeline;
-            }
 
             setReport(reportWithMeta);
             setPersistedTranscript(activeTranscript);
