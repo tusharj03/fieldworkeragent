@@ -95,17 +95,17 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                             <Home size={14} /> Building & Structure
                         </h4>
                         <div className="space-y-3">
-                            <div className="flex justify-between items-baseline text-sm border-b border-white/5 pb-2">
-                                <span className="text-slate-400">Type</span>
-                                <span className="font-medium text-slate-200">{report.scene_info.type}</span>
+                            <div className="flex justify-between items-start gap-4 text-sm border-b border-white/5 pb-2">
+                                <span className="text-slate-400 shrink-0 mt-0.5">Type</span>
+                                <span className="font-medium text-slate-200 text-right">{report.scene_info.type}</span>
                             </div>
-                            <div className="flex justify-between items-baseline text-sm border-b border-white/5 pb-2">
-                                <span className="text-slate-400">Construction</span>
-                                <span className="font-medium text-slate-200">{report.scene_info.building}</span>
+                            <div className="flex justify-between items-start gap-4 text-sm border-b border-white/5 pb-2">
+                                <span className="text-slate-400 shrink-0 mt-0.5">Construction</span>
+                                <span className="font-medium text-slate-200 text-right">{report.scene_info.building}</span>
                             </div>
-                            <div className="flex justify-between items-baseline text-sm">
-                                <span className="text-slate-400">Exposures</span>
-                                <span className="font-medium text-slate-200">{report.scene_info.exposures}</span>
+                            <div className="flex justify-between items-start gap-4 text-sm">
+                                <span className="text-slate-400 shrink-0 mt-0.5">Exposures</span>
+                                <span className="font-medium text-slate-200 text-right">{report.scene_info.exposures}</span>
                             </div>
                         </div>
                     </div>
@@ -114,13 +114,13 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                             <Flame size={14} /> Fire Conditions
                         </h4>
                         <div className="space-y-3">
-                            <div className="flex justify-between items-baseline text-sm border-b border-white/5 pb-2">
-                                <span className="text-slate-400">Smoke</span>
-                                <span className="font-medium text-slate-200">{report.scene_info.smoke_conditions}</span>
+                            <div className="flex justify-between items-start gap-4 text-sm border-b border-white/5 pb-2">
+                                <span className="text-slate-400 shrink-0 mt-0.5">Smoke</span>
+                                <span className="font-medium text-slate-200 text-right">{report.scene_info.smoke_conditions}</span>
                             </div>
-                            <div className="flex justify-between items-baseline text-sm">
-                                <span className="text-slate-400">Flames</span>
-                                <span className="font-medium text-slate-200">{report.scene_info.flame_conditions}</span>
+                            <div className="flex justify-between items-start gap-4 text-sm">
+                                <span className="text-slate-400 shrink-0 mt-0.5">Flames</span>
+                                <span className="font-medium text-slate-200 text-right">{report.scene_info.flame_conditions}</span>
                             </div>
                         </div>
                     </div>
