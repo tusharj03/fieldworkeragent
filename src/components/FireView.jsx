@@ -433,7 +433,7 @@ export const FireView = ({ user }) => {
             <div className="max-w-4xl mx-auto space-y-8 relative">
                 {/* Back Button for Report View */}
                 {report && !isAnalyzing && (
-                    <div className="absolute -top-12 left-0 z-10">
+                    <div className="mb-6">
                         <button
                             onClick={handleBack}
                             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group px-3 py-2 rounded-lg hover:bg-white/5"
