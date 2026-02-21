@@ -134,17 +134,17 @@ export const useRealtimeTranscription = () => {
                             const lastSegment = newSegments[lastIndex];
                             // If the last one was a pause marker, we ALWAYS start a new actual text segment
                             if (lastSegment.text.includes('[[PAUSE')) {
-                                newSegments.push({ speaker, text, isFinal });
+                                newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
                             } else if (!lastSegment.isFinal) {
-                                // Overwrite the interim
-                                newSegments[lastIndex] = { speaker, text, isFinal };
+                                // Overwrite the interim but KEEP the original segment timestamp (start of speaking)
+                                newSegments[lastIndex] = { ...lastSegment, speaker, text, isFinal };
                             } else {
                                 // Add new segment
-                                newSegments.push({ speaker, text, isFinal });
+                                newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
                             }
                         } else {
                             // First segment ever
-                            newSegments.push({ speaker, text, isFinal });
+                            newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
                         }
                         return newSegments;
                     });
@@ -166,10 +166,16 @@ export const useRealtimeTranscription = () => {
         }
     }, [apiKey]);
 
-    // Compute flattened transcript with clean spacing
+    // Compute flattened transcript with clean spacing and hidden timestamps
     const transcript = useMemo(() => {
         return transcriptSegments
-            .map(s => s.text)
+            .map(s => {
+                if (s.isFinal && s.timestamp && !s.text.includes('[[PAUSE') && !s.text.includes('[[TIME')) {
+                    const timeString = s.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    return `[[TIME ${timeString}]] ${s.text}`;
+                }
+                return s.text;
+            })
             .filter(Boolean)
             .join(' ')
             .replace(/\s+/g, ' ') // Ensure no double spaces

@@ -163,12 +163,17 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
 
         const endPhrases = [
             "end note",
+            "end the note",
             "and note",
             "and no",
             "edge note",
             "end of note",
             "close note",
-            "that's it"
+            "finish note",
+            "finished note",
+            "that's it",
+            "that is it",
+            "stop note"
         ];
 
         const foundNotes = [];
@@ -242,8 +247,7 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                     }
                 }
             }
-
-            let noteContent = activeTranscript.substring(startOfNote, endOfContent).replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').trim();
+            let noteContent = activeTranscript.substring(startOfNote, endOfContent).replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/gi, '').trim();
             if (noteContent && noteContent.length > 3) {
                 if (!foundNotes.includes(noteContent)) {
                     foundNotes.push(noteContent);
@@ -432,11 +436,8 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
         }
     };
 
-    // Use the persisted transcript if we have a report (for correct display after reload)
-    // Otherwise use the active (restored + live) transcript
-    // Strip [[PAUSE ...]] markers before rendering so the user never sees them
     const rawTranscript = report ? persistedTranscript : activeTranscript;
-    const displayTranscript = rawTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
+    const displayTranscript = rawTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/g, '');
 
     // --- Auto-Scroll Logic for Transcript ---
     const transcriptScrollRef = useRef(null);
@@ -567,12 +568,12 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                                                         <div className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
                                                             {restoredTranscript && (
                                                                 <span className="opacity-100">
-                                                                    {restoredTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '')}
+                                                                    {restoredTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/g, '')}
                                                                 </span>
                                                             )}
                                                             {transcriptSegments.map((seg, idx) => {
-                                                                const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
-                                                                if (!text.trim() && seg.text.includes('[[PAUSE')) return null;
+                                                                const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/g, '');
+                                                                if (!text.trim() && (seg.text.includes('[[PAUSE') || seg.text.includes('[[TIME'))) return null;
 
                                                                 return (
                                                                     <React.Fragment key={idx}>
