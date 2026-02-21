@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car, Settings } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -7,6 +7,14 @@ import { SortableItem } from './SortableItem';
 import { useLayoutEditor } from '../hooks/useLayoutEditor';
 
 export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
+    const topRef = useRef(null);
+
+    useEffect(() => {
+        if (topRef.current && report) {
+            topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [report]);
+
     if (!report) return null;
 
     const isFireMode = report.category?.toLowerCase().includes('fire') || report.category?.toLowerCase() === 'hazmat' || report.category?.toLowerCase() === 'rescue';
@@ -263,30 +271,56 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         {/* FIRST COLUMN */}
                         <div>
                             {isFireMode ? (
-                                <>
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                        <Activity size={14} /> Actions Taken
-                                    </h4>
-                                    <ul className="space-y-3">
-                                        {report.actions_taken?.map((action, i) => (
-                                            <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-                                                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-                                                <span>{action}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </>
+                                <div className="space-y-4">
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                            <Activity size={14} /> Actions Taken
+                                        </h4>
+                                        <ul className="space-y-2">
+                                            {report.actions_taken?.map((action, i) => (
+                                                <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+                                                    <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
+                                                    <span>{action}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    {report.action_items && report.action_items.length > 0 && (
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
+                                                <CheckCircle size={14} className="text-emerald-500" /> Suggested Action Items
+                                            </h4>
+                                            <ul className="space-y-1">
+                                                {report.action_items.map((item, i) => (
+                                                    <li key={i} className="group">
+                                                        <button
+                                                            onClick={() => onActionComplete && onActionComplete(item)}
+                                                            className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 py-1.5 px-2 -ml-2 rounded-lg' : ''}`}
+                                                            disabled={!onActionComplete}
+                                                        >
+                                                            <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
+                                                                {onActionComplete && <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                                                            </div>
+                                                            <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>{item}</span>
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
                                         <CheckCircle size={14} className="text-emerald-500" /> Action Items
                                     </h4>
-                                    <ul className="space-y-2">
+                                    <ul className="space-y-1">
                                         {report.action_items?.map((item, i) => (
                                             <li key={i} className="group">
                                                 <button
                                                     onClick={() => onActionComplete && onActionComplete(item)}
-                                                    className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 p-2 -ml-2 rounded-lg' : ''}`}
+                                                    className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 py-1.5 px-2 -ml-2 rounded-lg' : ''}`}
                                                     disabled={!onActionComplete}
                                                 >
                                                     <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
@@ -307,19 +341,39 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         {/* SECOND COLUMN */}
                         <div>
                             {isFireMode ? (
-                                <>
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                        <AlertTriangle size={14} /> Identified Hazards
-                                    </h4>
-                                    <ul className="space-y-3">
-                                        {report.hazards?.map((hazard, i) => (
-                                            <li key={i} className="flex items-start gap-3 text-sm text-slate-300 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
-                                                <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                                <span>{hazard}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </>
+                                <div className="space-y-6">
+                                    {report.hazards && report.hazards.length > 0 && (
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
+                                                <AlertTriangle size={14} /> Identified Hazards
+                                            </h4>
+                                            <ul className="space-y-3">
+                                                {report.hazards.map((hazard, i) => (
+                                                    <li key={i} className="flex items-start gap-3 text-sm text-slate-300 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
+                                                        <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                                        <span>{hazard}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {report.qa_flags && report.qa_flags.length > 0 && (
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-3">
+                                                <ShieldAlert size={14} className="text-amber-500" /> QA Flags
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {report.qa_flags.map((flag, i) => (
+                                                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
+                                                        <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                                                        <span>{flag}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 report.qa_flags && report.qa_flags.length > 0 ? (
                                     <div className="space-y-3">
@@ -409,7 +463,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 flex flex-col">
+        <div ref={topRef} className="max-w-4xl mx-auto space-y-6 flex flex-col pt-4">
             {/* Header Toolbar (Above the Report Card) */}
             <div className="flex justify-end mb-2 w-full">
                 <button
