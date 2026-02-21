@@ -143,6 +143,7 @@ export const FireView = ({ user }) => {
         // Case insensitive matching
         const triggerPhrases = [
             "note to self",
+            "add note to self",
             "take a note",
             "important note",
             "make a note"
