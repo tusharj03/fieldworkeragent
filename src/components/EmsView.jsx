@@ -110,8 +110,8 @@ export const EmsView = ({ user, activeTemplate, setActiveTemplate }) => {
                     <div className="bg-slate-900/40 border border-white/10 rounded-xl p-4 animate-fade-in">
                         <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Detected Speakers</h3>
                         <div className="flex flex-wrap gap-3">
-                            {activeSpeakers.size === 0 && <span className="text-slate-600 text-sm italic">Listening...</span>}
-                            {Array.from(activeSpeakers).map(speakerId => {
+                            {activeSpeakers.length === 0 && <span className="text-slate-600 text-sm italic">Listening...</span>}
+                            {activeSpeakers.map(speakerId => {
                                 const isConsented = consentedSpeakers.has(speakerId);
                                 return (
                                     <button
@@ -146,17 +146,21 @@ export const EmsView = ({ user, activeTemplate, setActiveTemplate }) => {
                     </div>
 
                     <div className="space-y-4">
-                        {transcriptSegments.map((seg, idx) => (
-                            <div key={idx} className={`flex gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-70' : 'opacity-100'}`}>
-                                <div className="w-16 shrink-0 text-xs font-bold text-slate-500 pt-1">
-                                    Voice {seg.speaker}
+                        {transcriptSegments.map((seg, idx) => {
+                            const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
+                            if (!text.trim() && seg.text.includes('[[PAUSE')) return null;
+
+                            return (
+                                <div key={idx} className={`inline gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-50 italic' : 'opacity-100'}`}>
+                                    <span className="text-xs font-bold text-slate-500 mr-2">V{seg.speaker}:</span>
+                                    <span className="text-lg md:text-xl leading-relaxed text-slate-200 font-light">
+                                        {text}
+                                        {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
+                                    </span>
+                                    {' '}
                                 </div>
-                                <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light flex-1">
-                                    {seg.text}
-                                    {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
-                                </p>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {transcriptSegments.length === 0 && (
                             <div className="text-center py-4 text-slate-500 italic">
                                 Audio detected but no speakers approved yet.

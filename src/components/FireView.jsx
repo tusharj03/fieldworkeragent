@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Mic, Info, Play, Pause, AlertCircle, Phone, ArrowLeft, RefreshCw, Layers, StickyNote, Activity, FileText, Download, ShieldAlert, CheckCircle, Flame, Car, Settings } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
@@ -8,19 +8,20 @@ import { FireActionItems } from './FireActionItems';
 import { SortableItem } from './SortableItem';
 import { RorkService } from '../services/rork.js';
 import { PdfService } from '../services/pdf.js';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition.js';
+import { useRealtimeTranscription } from '../hooks/useRealtimeTranscription.js';
 import { useLayoutEditor } from '../hooks/useLayoutEditor.js';
 
 export const FireView = ({ user }) => {
     const {
         isRecording,
         transcript,
+        transcriptSegments,
         startRecording,
         stopRecording,
         clearTranscript,
         audioUrl,
         error: voiceError
-    } = useVoiceRecognition();
+    } = useRealtimeTranscription();
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [report, setReport] = useState(() => {
@@ -92,7 +93,9 @@ export const FireView = ({ user }) => {
     const [error, setError] = useState(null);
 
     // Combine restored text (from previous session) with live text (from current session)
-    const activeTranscript = [restoredTranscript, transcript].filter(Boolean).join(' ');
+    const activeTranscript = useMemo(() => {
+        return [restoredTranscript, transcript].filter(Boolean).join(' ');
+    }, [restoredTranscript, transcript]);
 
     // Effect: Persist in-progress transcript to HISTORY
     useEffect(() => {
@@ -137,7 +140,7 @@ export const FireView = ({ user }) => {
         }
     }, [activeTranscript, report, currentReportId, user.uid]);
 
-    // Refs for polling interval
+    // Refs for polling interval to prevent stale closure issues in the background loop
     const activeTranscriptRef = useRef(activeTranscript);
     const actionItemsRef = useRef(actionItems);
 
@@ -146,12 +149,10 @@ export const FireView = ({ user }) => {
         actionItemsRef.current = actionItems;
     }, [activeTranscript, actionItems]);
 
-    // Extract "Note to Self" items
-    useEffect(() => {
-        if (!activeTranscript) return;
+    // Extract "Note to Self" items via useMemo for performance
+    const extractedNotes = useMemo(() => {
+        if (!activeTranscript) return [];
 
-        // Phrases that trigger a note
-        // Case insensitive matching
         const triggerPhrases = [
             "note to self",
             "add note to self",
@@ -170,24 +171,12 @@ export const FireView = ({ user }) => {
             "that's it"
         ];
 
-        // We want to find all instances of these phrases and capture the text after them
-        // until the end of the sentence or the next trigger phrase.
-        // Simple heuristic: Text after trigger until '.' or '?' or newline
-
-        const extractedNotes = [];
+        const foundNotes = [];
         const lowerTranscript = activeTranscript.toLowerCase();
 
-        let lastIndex = 0;
-
-        // Find all occurrences
-        // This is a basic implementation - for production, might want more robust NLP or regex
-        // We will scan the whole transcript to rebuild the notes list to avoid duplicates/state desync
-
-        // Helper to find the first occurring trigger after a certain index
         const findNextTrigger = (startIndex) => {
             let nextTrigger = null;
             let minIndex = Infinity;
-
             triggerPhrases.forEach(phrase => {
                 const idx = lowerTranscript.indexOf(phrase, startIndex);
                 if (idx !== -1 && idx < minIndex) {
@@ -195,14 +184,12 @@ export const FireView = ({ user }) => {
                     nextTrigger = phrase;
                 }
             });
-
             return nextTrigger ? { phrase: nextTrigger, index: minIndex } : null;
         };
 
         const findNextEndPhrase = (startIndex) => {
             let nextEnd = null;
             let minIndex = Infinity;
-
             endPhrases.forEach(phrase => {
                 const idx = lowerTranscript.indexOf(phrase, startIndex);
                 if (idx !== -1 && idx < minIndex) {
@@ -210,7 +197,6 @@ export const FireView = ({ user }) => {
                     nextEnd = phrase;
                 }
             });
-
             return nextEnd ? { phrase: nextEnd, index: minIndex } : null;
         };
 
@@ -220,57 +206,60 @@ export const FireView = ({ user }) => {
             if (!match) break;
 
             // Found a trigger
-            const startOfNote = match.index + match.phrase.length;
+            let startOfNote = match.index + match.phrase.length;
 
-            // Find end of note (next punctuation or next trigger)
+            // Skip immediate punctuation/spaces that Deepgram might add after the trigger itself
+            while (startOfNote < lowerTranscript.length && /^[.\s,!?:]/.test(lowerTranscript[startOfNote])) {
+                startOfNote++;
+            }
+
             const nextTriggerMatch = findNextTrigger(startOfNote);
             const nextEndPhraseMatch = findNextEndPhrase(startOfNote);
-            const nextPeriod = lowerTranscript.indexOf('.', startOfNote);
-            const nextQuestion = lowerTranscript.indexOf('?', startOfNote);
             const nextPauseMatch = lowerTranscript.substring(startOfNote).match(/\[\[pause \d{2}:\d{2}:\d{2}\]\]/);
             const nextPause = nextPauseMatch ? startOfNote + nextPauseMatch.index : -1;
 
-            // Determine end index
             let endOfNote = lowerTranscript.length;
+            let endOfContent = lowerTranscript.length;
 
             if (nextTriggerMatch && nextTriggerMatch.index < endOfNote) {
                 endOfNote = nextTriggerMatch.index;
+                endOfContent = nextTriggerMatch.index;
             }
-            // First valid terminator wins
+
             const nextEndPhraseIdx = nextEndPhraseMatch ? nextEndPhraseMatch.index : -1;
-            const possibleEnds = [nextPeriod, nextQuestion, nextPause, nextEndPhraseIdx].filter(idx => idx !== -1);
+            const possibleEnds = [nextPause, nextEndPhraseIdx].filter(idx => idx !== -1);
+
             if (possibleEnds.length > 0) {
                 const earliestEnd = Math.min(...possibleEnds);
                 if (earliestEnd < endOfNote) {
-                    // Include the punctuation if it was period/question, but not if it was [pause]
-                    // If it's a pause, we take up to the pause start
+                    endOfContent = earliestEnd;
                     endOfNote = earliestEnd;
-                    if (earliestEnd === nextPeriod || earliestEnd === nextQuestion) {
-                        endOfNote += 1;
+
+                    // If we terminated on an end phrase, consume the phrase in the transcript 
+                    // but keep it OUT of the content.
+                    if (earliestEnd === nextEndPhraseIdx) {
+                        endOfNote += nextEndPhraseMatch.phrase.length;
                     }
                 }
             }
 
-            // Remove the [[PAUSE ...]] marker from the extracted note string itself just in case
-            let noteContent = activeTranscript.substring(startOfNote, endOfNote).replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').trim();
-
-            // Only add if meaningful content
+            let noteContent = activeTranscript.substring(startOfNote, endOfContent).replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').trim();
             if (noteContent && noteContent.length > 3) {
-                // Check if it's already in our extracted list (dedupe within this loop)
-                if (!extractedNotes.includes(noteContent)) {
-                    extractedNotes.push(noteContent);
+                if (!foundNotes.includes(noteContent)) {
+                    foundNotes.push(noteContent);
                 }
             }
-
             currentSearchIdx = endOfNote;
         }
+        return foundNotes;
+    }, [activeTranscript]);
 
-        // Update state if different
+    // Sync extraction to state if needed for other components or just use directly
+    useEffect(() => {
         if (JSON.stringify(extractedNotes) !== JSON.stringify(notes)) {
             setNotes(extractedNotes);
         }
-
-    }, [activeTranscript]);
+    }, [extractedNotes, notes]);
 
     // Poll for Action Items Updates
     useEffect(() => {
@@ -286,8 +275,7 @@ export const FireView = ({ user }) => {
             } catch (err) {
                 console.error("Failed to update action items", err);
             }
-        }, 10000); // 10 seconds
-
+        }, 8000); // Slightly more frequent polling
         return () => clearInterval(interval);
     }, [isRecording]);
 
@@ -572,9 +560,28 @@ export const FireView = ({ user }) => {
                                                         ref={transcriptScrollRef}
                                                         onScroll={handleTranscriptScroll}
                                                     >
-                                                        <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                                                            {displayTranscript}
-                                                        </p>
+                                                        <div className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
+                                                            {restoredTranscript && (
+                                                                <span className="opacity-100">
+                                                                    {restoredTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '')}
+                                                                </span>
+                                                            )}
+                                                            {transcriptSegments.map((seg, idx) => {
+                                                                const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
+                                                                if (!text.trim() && seg.text.includes('[[PAUSE')) return null;
+
+                                                                return (
+                                                                    <React.Fragment key={idx}>
+                                                                        {(idx > 0 || restoredTranscript) && ' '}
+                                                                        <span
+                                                                            className={`transition-opacity duration-300 ${seg.isFinal ? 'opacity-100' : 'opacity-50 italic'}`}
+                                                                        >
+                                                                            {text}
+                                                                        </span>
+                                                                    </React.Fragment>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </SortableItem>
