@@ -448,6 +448,26 @@ export const FireView = ({ user }) => {
     const rawTranscript = report ? persistedTranscript : activeTranscript;
     const displayTranscript = rawTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
 
+    // --- Auto-Scroll Logic for Transcript ---
+    const transcriptScrollRef = useRef(null);
+    const [isTranscriptUserScrolled, setIsTranscriptUserScrolled] = useState(false);
+
+    useEffect(() => {
+        // Only trigger auto-scroll if the user hasn't scrolled up
+        if (!isTranscriptUserScrolled && transcriptScrollRef.current) {
+            const { scrollHeight, clientHeight } = transcriptScrollRef.current;
+            transcriptScrollRef.current.scrollTop = scrollHeight - clientHeight;
+        }
+    }, [displayTranscript, isTranscriptUserScrolled]);
+
+    const handleTranscriptScroll = () => {
+        if (!transcriptScrollRef.current) return;
+        const { scrollTop, scrollHeight, clientHeight } = transcriptScrollRef.current;
+        // Check if we are relatively close to the bottom (within 20px)
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 20;
+        setIsTranscriptUserScrolled(!isNearBottom);
+    };
+
     const [manualEvents, setManualEvents] = useState([]);
 
     const handleToggleActionItem = (itemId) => {
@@ -540,16 +560,22 @@ export const FireView = ({ user }) => {
                                     if (key === 'transcript') {
                                         return (
                                             <SortableItem key="transcript" id="transcript" isEditing={isEditingLayout} className={`${actionItems.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-                                                <div className="glass-panel rounded-2xl p-6 md:p-8 h-full transition-all duration-500">
-                                                    <div className="flex items-center justify-between mb-4">
+                                                <div className="glass-panel rounded-2xl p-6 md:p-8 h-full transition-all duration-500 overflow-hidden flex flex-col">
+                                                    <div className="flex items-center justify-between mb-4 shrink-0">
                                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                             {report ? 'Report Transcript' : 'Live Transcript'}
                                                         </span>
                                                         {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                                                     </div>
-                                                    <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                                                        {displayTranscript}
-                                                    </p>
+                                                    <div
+                                                        className="overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-[150px] max-h-[500px]"
+                                                        ref={transcriptScrollRef}
+                                                        onScroll={handleTranscriptScroll}
+                                                    >
+                                                        <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
+                                                            {displayTranscript}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </SortableItem>
                                         );
