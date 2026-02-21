@@ -101,6 +101,9 @@ export const RorkService = {
       systemPrompt = `You are an expert Fire/Rescue reporting assistant using the NERIS (National Emergency Response Information System) standard.
       Your job is to listen to the firefighter's transcript and extract technical data for incident reporting.
       Current System Time: ${currentTime}
+      
+      CRITICAL TIMELINE INSTRUCTION: The transcript contains embedded, invisible timestamps at natural pauses formatted like [[PAUSE 14:32:05]]. You MUST use these exact markers to determine the true, real-world time of events when building the timeline. DO NOT guess or hallucinate times. Match the event to the nearest preceding or succeeding PAUSE marker.
+
       ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
       ${eventsContext}
       
@@ -144,9 +147,14 @@ export const RorkService = {
       `;
     } else {
       // EMS PROMPT
-      systemPrompt = `You are an expert EMS field assistant. 
-      Your job is to listen to the transcript and extract key information to fill out a ePCR / patient care report.
-      ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
+      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      systemPrompt = `You are an expert EMS/Paramedic reporting assistant.
+        Your job is to listen to the paramedic's transcript and extract clinical data for patient care reports.
+        Current System Time: ${currentTime}
+        
+        CRITICAL TIMELINE INSTRUCTION: The transcript contains embedded, invisible timestamps at natural pauses formatted like [[PAUSE 14:32:05]]. You MUST use these exact markers to determine the true, real-world time of interventions or status changes when building the timeline. DO NOT guess or hallucinate times. Match the event to the nearest preceding or succeeding PAUSE marker.
+
+        ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
       
       Return a JSON object with the following structure:
       {

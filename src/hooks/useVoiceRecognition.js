@@ -54,9 +54,11 @@ export const useVoiceRecognition = () => {
       if (!newInterim) {
         silenceTimerRef.current = setTimeout(() => {
           setFinalTranscript(prev => {
-            // Prevent duplicate pauses back-to-back
-            if (prev && !prev.endsWith(' [PAUSE]')) {
-              return prev + ' [PAUSE]';
+            // Prevent duplicate pauses back-to-back using a regex that matches the dynamic tag
+            if (prev && !/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]$/.test(prev.trim())) {
+              const now = new Date();
+              const timeString = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              return prev + ` [[PAUSE ${timeString}]]`;
             }
             return prev;
           });

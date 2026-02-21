@@ -212,7 +212,8 @@ export const FireView = ({ user }) => {
             const nextEndPhraseMatch = findNextEndPhrase(startOfNote);
             const nextPeriod = lowerTranscript.indexOf('.', startOfNote);
             const nextQuestion = lowerTranscript.indexOf('?', startOfNote);
-            const nextPause = lowerTranscript.indexOf('[pause]', startOfNote); // NEW: Look for pause marker
+            const nextPauseMatch = lowerTranscript.substring(startOfNote).match(/\[\[pause \d{2}:\d{2}:\d{2}\]\]/);
+            const nextPause = nextPauseMatch ? startOfNote + nextPauseMatch.index : -1;
 
             // Determine end index
             let endOfNote = lowerTranscript.length;
@@ -235,8 +236,8 @@ export const FireView = ({ user }) => {
                 }
             }
 
-            // Remove the [pause] marker from the extracted note string itself just in case
-            let noteContent = activeTranscript.substring(startOfNote, endOfNote).replace(/\[PAUSE\]/gi, '').trim();
+            // Remove the [[PAUSE ...]] marker from the extracted note string itself just in case
+            let noteContent = activeTranscript.substring(startOfNote, endOfNote).replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').trim();
 
             // Only add if meaningful content
             if (noteContent && noteContent.length > 3) {
@@ -428,9 +429,9 @@ export const FireView = ({ user }) => {
 
     // Use the persisted transcript if we have a report (for correct display after reload)
     // Otherwise use the active (restored + live) transcript
-    // Strip [PAUSE] markers before rendering so the user never sees them
+    // Strip [[PAUSE ...]] markers before rendering so the user never sees them
     const rawTranscript = report ? persistedTranscript : activeTranscript;
-    const displayTranscript = rawTranscript.replace(/\[PAUSE\]/g, '');
+    const displayTranscript = rawTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
 
     const [manualEvents, setManualEvents] = useState([]);
 
