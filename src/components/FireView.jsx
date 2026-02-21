@@ -150,6 +150,9 @@ export const FireView = ({ user }) => {
 
         const endPhrases = [
             "end note",
+            "and note",
+            "and no",
+            "edge note",
             "end of note",
             "close note",
             "that's it"
