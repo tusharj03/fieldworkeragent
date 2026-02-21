@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car, Settings } from 'lucide-react';
+import { FileText, AlertTriangle, CheckCircle, ClipboardList, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car, Settings } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { VitalsChart } from './VitalsChart';
@@ -289,7 +289,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                                     {report.action_items && report.action_items.length > 0 && (
                                         <div>
                                             <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
-                                                <CheckCircle size={14} className="text-emerald-500" /> Suggested Action Items
+                                                <ClipboardList size={14} className="text-slate-500" /> Suggested Action Items
                                             </h4>
                                             <ul className="space-y-1">
                                                 {report.action_items.map((item, i) => (
@@ -313,7 +313,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                             ) : (
                                 <div className="space-y-3">
                                     <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
-                                        <CheckCircle size={14} className="text-emerald-500" /> Action Items
+                                        <ClipboardList size={14} className="text-slate-500" /> Action Items
                                     </h4>
                                     <ul className="space-y-1">
                                         {report.action_items?.map((item, i) => (
