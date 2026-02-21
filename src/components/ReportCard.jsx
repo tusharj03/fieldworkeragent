@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
-import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car } from 'lucide-react';
+import { FileText, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Activity, Clock, ShieldAlert, DollarSign, Share2, Download, Flame, Home, Layers, Siren, Mic, Car, Settings } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { VitalsChart } from './VitalsChart';
+import { SortableItem } from './SortableItem';
+import { useLayoutEditor } from '../hooks/useLayoutEditor';
 
 export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
     if (!report) return null;
 
-    const isFireMode = report.mode === 'FIRE' || report.nfirs_mapping;
-    const isMVA = report.category?.toLowerCase() === 'mva';
-
-    // Helper to extract just the description if the AI accidentally includes the number
-    // E.g. "111 - Building Fire" -> "Building Fire"
-    const stripNerisCode = (text) => {
-        if (!text) return 'N/A';
-        return text.replace(/^[\d\s-:]+/, '').trim();
-    };
+    const isFireMode = report.category?.toLowerCase().includes('fire') || report.category?.toLowerCase() === 'hazmat' || report.category?.toLowerCase() === 'rescue';
+    const isMVA = report.category?.toLowerCase().includes('mva') || report.category?.toLowerCase().includes('vehicle');
 
     const getUrgencyColor = (urgency) => {
         switch (urgency?.toLowerCase()) {
-            case 'high': return 'text-red-400 bg-red-500/10 border-red-500/20';
-            case 'medium': return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-            default: return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+            case 'critical': return 'text-red-500 border-red-500/50 bg-red-500/10';
+            case 'high': return 'text-orange-500 border-orange-500/50 bg-orange-500/10';
+            case 'medium': return 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10';
+            default: return 'text-blue-500 border-blue-500/50 bg-blue-500/10';
         }
+    };
+
+    const stripNerisCode = (str) => {
+        if (!str) return str;
+        return str.replace(/^[A-Z0-9]+ - /, '');
     };
 
     const Section = ({ title, icon: Icon, children, defaultOpen = true }) => {
@@ -52,44 +55,24 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
         );
     };
 
-    return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            {/* Main Header Card */}
-            <div className="glass-panel rounded-2xl p-6 md:p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 opacity-10">
-                    {isFireMode ? <Flame size={120} /> : <FileText size={120} />}
+    const { isEditingLayout, layoutOrder, toggleEditMode, saveLayout, handleDragEnd } = useLayoutEditor('report');
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const renderPanels = {
+        summary: (
+            <SortableItem key="summary" id="summary" isEditing={isEditingLayout}>
+                <div className="bg-slate-900/40 rounded-xl p-5 border border-white/5 backdrop-blur-sm mb-6">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">EXECUTIVE SUMMARY</h3>
+                    <p className="text-lg leading-relaxed text-slate-200 font-light">{report.summary}</p>
                 </div>
-
-                <div className="relative z-10">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <h2 className="text-3xl font-bold text-white tracking-tight">{report.category || 'Incident Report'}</h2>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-400">
-                                <span className="flex items-center gap-1.5">
-                                    <Clock size={14} />
-                                    {new Date(report.timestamp || Date.now()).toLocaleString()}
-                                </span>
-                                <span className="w-1 h-1 rounded-full bg-slate-600" />
-                                <span>ID: #{report.id || Math.floor(new Date(report.timestamp || Date.now()).getTime() % 10000)}</span>
-                            </div>
-                        </div>
-                        <span className={`px-4 py-1.5 rounded-full font-semibold text-sm border ${getUrgencyColor(report.urgency)}`}>
-                            {report.urgency || 'Normal'} Priority
-                        </span>
-                    </div>
-
-                    <div className="bg-slate-900/40 rounded-xl p-5 border border-white/5 backdrop-blur-sm">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">EXECUTIVE SUMMARY</h3>
-                        <p className="text-lg leading-relaxed text-slate-200 font-light">{report.summary}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* FIRE: Scene Info (Structures/Wildland) */}
-            {isFireMode && !isMVA && report.scene_info && (
-                <div className="grid md:grid-cols-2 gap-4">
+            </SortableItem>
+        ),
+        scene_info: (isFireMode && !isMVA && report.scene_info) ? (
+            <SortableItem key="scene_info" id="scene_info" isEditing={isEditingLayout}>
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div className="glass-panel rounded-xl p-5">
                         <h4 className="text-red-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
                             <Home size={14} /> Building & Structure
@@ -125,11 +108,11 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* FIRE: MVA Info */}
-            {isFireMode && isMVA && report.mva_info && (
-                <div className="glass-panel rounded-xl p-5">
+            </SortableItem>
+        ) : null,
+        mva_info: (isFireMode && isMVA && report.mva_info) ? (
+            <SortableItem key="mva_info" id="mva_info" isEditing={isEditingLayout}>
+                <div className="glass-panel rounded-xl p-5 mb-6">
                     <h4 className="text-blue-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
                         <Car size={14} /> Motor Vehicle Accident Details
                     </h4>
@@ -148,66 +131,60 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* EMS: Patient Info & Chief Complaint */}
-            {!isFireMode && (
-                <div className="grid md:grid-cols-2 gap-4">
-                    {/* Patient Info Box */}
-                    {report.patient_info && (
-                        <div className="glass-panel rounded-xl p-5">
-                            <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                Patient Info
-                            </h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                                    <span className="text-slate-400">Name</span>
-                                    <span className="font-medium text-slate-200">{report.patient_info.name}</span>
-                                </div>
-                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                                    <span className="text-slate-400">Age</span>
-                                    <span className="font-medium text-slate-200">{report.patient_info.age}</span>
-                                </div>
-                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                                    <span className="text-slate-400">Sex</span>
-                                    <span className="font-medium text-slate-200">{report.patient_info.sex}</span>
-                                </div>
-                                <div className="flex justify-between items-baseline text-sm group">
-                                    <span className="text-slate-400">Mental Status</span>
-                                    <span className="font-medium text-slate-200 text-right max-w-[60%] leading-tight">{report.patient_info.mental_status}</span>
-                                </div>
-                            </div>
+            </SortableItem>
+        ) : null,
+        patient_info: (!isFireMode && report.patient_info) ? (
+            <SortableItem key="patient_info" id="patient_info" isEditing={isEditingLayout}>
+                <div className="glass-panel rounded-xl p-5 mb-6">
+                    <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        Patient Info
+                    </h4>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Name</span>
+                            <span className="font-medium text-slate-200">{report.patient_info.name}</span>
                         </div>
-                    )}
-
-                    {/* Chief Complaint Box */}
-                    {report.chief_complaint && (
-                        <div className="glass-panel rounded-xl p-5">
-                            <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                Chief Complaint
-                            </h4>
-                            <div className="space-y-4">
-                                <div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Primary</span>
-                                    <p className="text-lg font-medium text-white leading-tight">{report.chief_complaint.primary}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Secondary</span>
-                                    <p className="text-sm text-slate-300 leading-relaxed">{report.chief_complaint.secondary}</p>
-                                </div>
-                            </div>
+                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Age</span>
+                            <span className="font-medium text-slate-200">{report.patient_info.age}</span>
                         </div>
-                    )}
+                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Sex</span>
+                            <span className="font-medium text-slate-200">{report.patient_info.sex}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline text-sm group">
+                            <span className="text-slate-400">Mental Status</span>
+                            <span className="font-medium text-slate-200 text-right max-w-[60%] leading-tight">{report.patient_info.mental_status}</span>
+                        </div>
+                    </div>
                 </div>
-            )}
-
-            {/* Timelines Section */}
-            {(report.vitals_timeline || report.interventions_timeline || report.timeline) && (
+            </SortableItem>
+        ) : null,
+        chief_complaint: (!isFireMode && report.chief_complaint) ? (
+            <SortableItem key="chief_complaint" id="chief_complaint" isEditing={isEditingLayout}>
+                <div className="glass-panel rounded-xl p-5 mb-6">
+                    <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        Chief Complaint
+                    </h4>
+                    <div className="space-y-4">
+                        <div>
+                            <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Primary</span>
+                            <p className="text-lg font-medium text-white leading-tight">{report.chief_complaint.primary}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Secondary</span>
+                            <p className="text-sm text-slate-300 leading-relaxed">{report.chief_complaint.secondary}</p>
+                        </div>
+                    </div>
+                </div>
+            </SortableItem>
+        ) : null,
+        timeline: (report.vitals_timeline || report.interventions_timeline || report.timeline) ? (
+            <SortableItem key="timeline" id="timeline" isEditing={isEditingLayout}>
                 <Section title={isFireMode ? "Fireground Timeline" : "Clinical Timeline"} icon={Clock}>
                     <div className="space-y-8">
-
                         {/* FIRE TIMELINE */}
                         {isFireMode && report.timeline && (
                             <div className="relative pl-4 border-l-2 border-slate-800 space-y-6">
@@ -277,59 +254,113 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         )}
                     </div>
                 </Section>
-            )}
-
-            {/* FIRE: Actions & Hazards */}
-            {isFireMode && (
-                <Section title="Operations & Hazards" icon={ShieldAlert}>
-                    <div className="grid md:grid-cols-2 gap-8">
+            </SortableItem>
+        ) : null,
+        actions: (report.actions_taken || report.hazards || report.action_items || report.qa_flags) ? (
+            <SortableItem key="actions" id="actions" isEditing={isEditingLayout}>
+                <Section title={isFireMode ? "Operations & Hazards" : "Suggested Follow-up Items"} icon={ShieldAlert}>
+                    <div className="grid md:grid-cols-2 gap-8 relative">
+                        {/* FIRST COLUMN */}
                         <div>
-                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                <Activity size={14} /> Actions Taken
-                            </h4>
-                            <ul className="space-y-3">
-                                {report.actions_taken?.map((action, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-                                        <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-                                        <span>{action}</span>
-                                    </li>
-                                ))}
-                            </ul>
+                            {isFireMode ? (
+                                <>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
+                                        <Activity size={14} /> Actions Taken
+                                    </h4>
+                                    <ul className="space-y-3">
+                                        {report.actions_taken?.map((action, i) => (
+                                            <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+                                                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
+                                                <span>{action}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            ) : (
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                        <CheckCircle size={14} className="text-emerald-500" /> Action Items
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {report.action_items?.map((item, i) => (
+                                            <li key={i} className="group">
+                                                <button
+                                                    onClick={() => onActionComplete && onActionComplete(item)}
+                                                    className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 p-2 -ml-2 rounded-lg' : ''}`}
+                                                    disabled={!onActionComplete}
+                                                >
+                                                    <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
+                                                        {onActionComplete && <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                                                    </div>
+                                                    <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>{item}</span>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Divider for desktop */}
+                        <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-white/5 -ml-px" />
+
+                        {/* SECOND COLUMN */}
                         <div>
-                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                                <AlertTriangle size={14} /> Identified Hazards
-                            </h4>
-                            <ul className="space-y-3">
-                                {report.hazards?.map((hazard, i) => (
-                                    <li key={i} className="flex items-start gap-3 text-sm text-slate-300 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
-                                        <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                        <span>{hazard}</span>
-                                    </li>
-                                ))}
-                            </ul>
+                            {isFireMode ? (
+                                <>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
+                                        <AlertTriangle size={14} /> Identified Hazards
+                                    </h4>
+                                    <ul className="space-y-3">
+                                        {report.hazards?.map((hazard, i) => (
+                                            <li key={i} className="flex items-start gap-3 text-sm text-slate-300 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
+                                                <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                                <span>{hazard}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            ) : (
+                                report.qa_flags && report.qa_flags.length > 0 ? (
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                            <ShieldAlert size={14} className="text-amber-500" /> QA Flags
+                                        </h4>
+                                        <ul className="space-y-2">
+                                            {report.qa_flags.map((flag, i) => (
+                                                <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
+                                                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                                                    <span>{flag}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 opacity-50">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                            <ShieldAlert size={14} className="text-slate-600" /> QA Flags
+                                        </h4>
+                                        <p className="text-sm text-slate-500 italic">No flags detected.</p>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </div>
                 </Section>
-            )}
-
-
-
-            {/* EMS: Assessment */}
-            {!isFireMode && (
+            </SortableItem>
+        ) : null,
+        assessment: (!isFireMode && report.assessment) ? (
+            <SortableItem key="assessment" id="assessment" isEditing={isEditingLayout}>
                 <Section title="Clinical Assessment" icon={FileText}>
                     <div className="grid md:grid-cols-2 gap-8">
-                        {report.assessment && (
-                            <div className="space-y-4">
-                                {Object.entries(report.assessment).map(([key, value]) => (
-                                    <div key={key} className="relative pl-4 border-l-2 border-slate-700">
-                                        <span className="text-xs font-bold text-slate-500 uppercase block mb-1">{key}</span>
-                                        <p className="text-sm text-slate-300 leading-relaxed">{value}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
+                        <div className="space-y-4">
+                            {Object.entries(report.assessment).map(([key, value]) => (
+                                <div key={key} className="relative pl-4 border-l-2 border-slate-700">
+                                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">{key}</span>
+                                    <p className="text-sm text-slate-300 leading-relaxed">{value}</p>
+                                </div>
+                            ))}
+                        </div>
                         <div className="space-y-6">
                             {report.opqrst && (
                                 <div className="bg-slate-900/30 rounded-xl p-4 border border-white/5">
@@ -350,101 +381,11 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         </div>
                     </div>
                 </Section>
-            )}
-
-            {/* AI Assistant Section */}
-            <Section title="Suggested Follow-up Items" icon={ShieldAlert}>
-                <div className="space-y-8">
-                    <div className="grid md:grid-cols-2 gap-8 relative">
-
-                        {/* Action Items */}
-                        {report.action_items && (
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                    <CheckCircle size={14} className="text-emerald-500" /> Action Items
-                                </h4>
-                                <ul className="space-y-2">
-                                    {report.action_items.map((item, i) => (
-                                        <li key={i} className="group">
-                                            <button
-                                                onClick={() => onActionComplete && onActionComplete(item)}
-                                                className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 p-2 -ml-2 rounded-lg' : ''}`}
-                                                disabled={!onActionComplete}
-                                            >
-                                                <div className={`
-                                                    w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all
-                                                    ${onActionComplete
-                                                        ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20'
-                                                        : 'border-slate-600'}
-                                                `}>
-                                                    {onActionComplete && (
-                                                        <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    )}
-                                                </div>
-                                                <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>
-                                                    {item}
-                                                </span>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Divider for desktop */}
-                        <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-white/5 -ml-px" />
-
-                        {/* QA Flags */}
-                        <div>
-                            {report.qa_flags && report.qa_flags.length > 0 ? (
-                                <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        <ShieldAlert size={14} className="text-amber-500" /> QA Flags
-                                    </h4>
-                                    <ul className="space-y-2">
-                                        {report.qa_flags.map((flag, i) => (
-                                            <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
-                                                <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                                                <span>{flag}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ) : (
-                                <div className="space-y-3 opacity-50">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        <ShieldAlert size={14} className="text-slate-600" /> QA Flags
-                                    </h4>
-                                    <p className="text-sm text-slate-500 italic">No flags detected.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Billing Codes (Full Width Divider Top) */}
-                    {report.billing_codes && (
-                        <div className="pt-6 border-t border-white/5 space-y-3">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <DollarSign size={14} className="text-blue-400" /> Coding Analysis
-                            </h4>
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div className="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex justify-between items-center group hover:border-blue-500/30 transition-colors">
-                                    <span className="text-xs text-slate-500 font-medium">ICD-10 Recommendation</span>
-                                    <span className="font-mono text-sm font-bold text-blue-200">{report.billing_codes.icd10 || 'N/A'}</span>
-                                </div>
-                                <div className="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex justify-between items-center group hover:border-blue-500/30 transition-colors">
-                                    <span className="text-xs text-slate-500 font-medium">CPT / Service Level</span>
-                                    <span className="font-mono text-sm font-bold text-blue-200">{report.billing_codes.cpt || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </Section>
-
-            {/* NERIS Classifications (Displayed as text descriptions) */}
-            {isFireMode && report.neris_data && (
-                <div className="pt-6 border-t border-white/5 space-y-3">
+            </SortableItem>
+        ) : null,
+        neris: (isFireMode && report.neris_data) ? (
+            <SortableItem key="neris" id="neris" isEditing={isEditingLayout}>
+                <div className="pt-6 border-t border-white/5 space-y-3 mb-6">
                     <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                         <Layers size={14} className="text-purple-400" /> NERIS Classifications
                     </h4>
@@ -463,10 +404,73 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         </div>
                     </div>
                 </div>
-            )}
+            </SortableItem>
+        ) : null
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-6 flex flex-col">
+            {/* Header Toolbar (Above the Report Card) */}
+            <div className="flex justify-end mb-2 w-full">
+                <button
+                    onClick={isEditingLayout ? saveLayout : toggleEditMode}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditingLayout
+                        ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-slate-800/50 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                        }`}
+                >
+                    <Settings size={14} className={isEditingLayout ? 'animate-spin-slow' : ''} />
+                    {isEditingLayout ? 'Save Layout' : 'Edit Report Layout'}
+                </button>
+            </div>
+
+            {/* Main Header Card */}
+            <div className="glass-panel rounded-2xl p-6 md:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-10">
+                    {isFireMode ? <Flame size={120} /> : <FileText size={120} />}
+                </div>
+
+                <div className="relative z-10">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h2 className="text-3xl font-bold text-white tracking-tight">{report.category || 'Incident Report'}</h2>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-slate-400">
+                                <span className="flex items-center gap-1.5">
+                                    <Clock size={14} />
+                                    {new Date(report.timestamp || Date.now()).toLocaleString()}
+                                </span>
+                                <span className="w-1 h-1 rounded-full bg-slate-600" />
+                                <span>ID: #{report.id || Math.floor(new Date(report.timestamp || Date.now()).getTime() % 10000)}</span>
+                            </div>
+                        </div>
+                        <span className={`px-4 py-1.5 rounded-full font-semibold text-sm border ${getUrgencyColor(report.urgency)}`}>
+                            {report.urgency || 'Normal'} Priority
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Draggable Panels */}
+            <div className="w-full">
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={layoutOrder}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="flex flex-col gap-6">
+                            {layoutOrder.map(key => renderPanels[key])}
+                        </div>
+                    </SortableContext>
+                </DndContext>
+            </div>
 
             {/* Actions Footer */}
-
             <div className="flex flex-col md:flex-row gap-4 pt-4">
                 <button
                     onClick={onExport}

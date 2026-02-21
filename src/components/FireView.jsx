@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Mic, Info, Play, Pause, AlertCircle, Phone, ArrowLeft, RefreshCw, Layers, StickyNote, Activity, FileText, Download, ShieldAlert, CheckCircle, Flame, Car, Settings } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { MicrophoneButton } from './MicrophoneButton';
 import { ReportCard } from './ReportCard';
 import { FireActionItems } from './FireActionItems';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
-import { RorkService } from '../services/rork';
-import { PdfService } from '../services/pdf';
-import { Activity, AlertCircle, ArrowLeft, StickyNote } from 'lucide-react';
+import { SortableItem } from './SortableItem';
+import { RorkService } from '../services/rork.js';
+import { PdfService } from '../services/pdf.js';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition.js';
+import { useLayoutEditor } from '../hooks/useLayoutEditor.js';
 
 export const FireView = ({ user }) => {
     const {
@@ -23,6 +27,13 @@ export const FireView = ({ user }) => {
         const saved = localStorage.getItem('fire_report');
         return saved ? JSON.parse(saved) : null;
     });
+
+    // Draggable Layout Mechanics
+    const { isEditingLayout, layoutOrder, toggleEditMode, saveLayout, handleDragEnd } = useLayoutEditor('live');
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
 
     const [actionItems, setActionItems] = useState([]);
     const [notes, setNotes] = useState([]);
@@ -491,61 +502,88 @@ export const FireView = ({ user }) => {
                         {displayTranscript && !isRecording && (
                             <button
                                 onClick={handleStartNew}
-                                className="mt-6 text-sm text-red-400 hover:text-red-300 underline decoration-red-500/30 hover:decoration-red-400 underline-offset-4 transition-all"
+                                className="mt-6 text-sm text-red-400 hover:text-red-300 underline decoration-red-500/30 hover:decoration-red-400 underline-offset-4 transition-all block mx-auto"
                             >
                                 Discard & Start New Report
+                            </button>
+                        )}
+
+                        {/* Edit Layout Button */}
+                        {displayTranscript && (
+                            <button
+                                onClick={isEditingLayout ? saveLayout : toggleEditMode}
+                                className={`mt-6 mx-auto flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditingLayout
+                                    ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/20'
+                                    : 'bg-slate-800/50 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                                    }`}
+                            >
+                                <Settings size={14} className={isEditingLayout ? 'animate-spin-slow' : ''} />
+                                {isEditingLayout ? 'Save Layout' : 'Edit Live Layout'}
                             </button>
                         )}
                     </div>
                 )}
 
                 {/* Transcript Area & Action Items */}
-                <div className={`
-          transition-all duration-500
-          ${displayTranscript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}
-        `}>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Transcript Column */}
-                        <div className={`${actionItems.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'} glass-panel rounded-2xl p-6 md:p-8 transition-all duration-500`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    {report ? 'Report Transcript' : 'Live Transcript'}
-                                </span>
-                                {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                <div className={`transition-all duration-500 ${displayTranscript ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}`}>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={layoutOrder}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {layoutOrder.map(key => {
+                                    if (key === 'transcript') {
+                                        return (
+                                            <SortableItem key="transcript" id="transcript" isEditing={isEditingLayout} className={`${actionItems.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                                                <div className="glass-panel rounded-2xl p-6 md:p-8 h-full transition-all duration-500">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                            {report ? 'Report Transcript' : 'Live Transcript'}
+                                                        </span>
+                                                        {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                                                    </div>
+                                                    <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
+                                                        {displayTranscript}
+                                                    </p>
+                                                </div>
+                                            </SortableItem>
+                                        );
+                                    }
+                                    if (key === 'checklist' && actionItems.length > 0) {
+                                        return (
+                                            <SortableItem key="checklist" id="checklist" isEditing={isEditingLayout} className="lg:col-span-1 animate-slide-in-right">
+                                                <FireActionItems items={actionItems} onToggle={handleToggleActionItem} />
+                                            </SortableItem>
+                                        );
+                                    }
+                                    if (key === 'notes' && notes.length > 0) {
+                                        return (
+                                            <SortableItem key="notes" id="notes" isEditing={isEditingLayout} className="lg:col-span-3 animate-slide-up">
+                                                <div className="glass-panel p-5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 h-full">
+                                                    <h3 className="text-yellow-400 font-bold uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
+                                                        <StickyNote size={14} /> Live Field Notes
+                                                    </h3>
+                                                    <div className="grid md:grid-cols-2 gap-3">
+                                                        {notes.map((note, idx) => (
+                                                            <div key={idx} className="bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/10 text-yellow-100 text-sm">
+                                                                "{note}"
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </SortableItem>
+                                        );
+                                    }
+                                    return null;
+                                })}
                             </div>
-                            <p className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                                {displayTranscript}
-                            </p>
-                        </div>
-
-                        {/* Action Items Column - Only show if there are items */}
-                        {actionItems.length > 0 && (
-                            <div className="lg:col-span-1 animate-slide-in-right">
-                                <FireActionItems
-                                    items={actionItems}
-                                    onToggle={handleToggleActionItem}
-                                />
-                            </div>
-                        )}
-
-                        {/* Live Notes Column - Only show if there are notes */}
-                        {notes.length > 0 && (
-                            <div className="lg:col-span-3 animate-slide-up">
-                                <div className="glass-panel p-5 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
-                                    <h3 className="text-yellow-400 font-bold uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
-                                        <StickyNote size={14} /> Live Field Notes
-                                    </h3>
-                                    <div className="grid md:grid-cols-2 gap-3">
-                                        {notes.map((note, idx) => (
-                                            <div key={idx} className="bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/10 text-yellow-100 text-sm">
-                                                "{note}"
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                        </SortableContext>
+                    </DndContext>
                 </div>
 
                 {/* Analysis Loading */}
