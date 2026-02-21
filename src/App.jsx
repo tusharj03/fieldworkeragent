@@ -159,7 +159,11 @@ function App() {
 
           {currentView === 'dashboard' && (
             mode === 'FIRE' ? (
-              <FireView user={user} />
+              <FireView
+                user={user}
+                activeTemplate={activeTemplate}
+                setActiveTemplate={setActiveTemplate}
+              />
             ) : (
               <EmsView
                 user={user}

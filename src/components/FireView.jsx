@@ -11,7 +11,7 @@ import { PdfService } from '../services/pdf.js';
 import { useRealtimeTranscription } from '../hooks/useRealtimeTranscription.js';
 import { useLayoutEditor } from '../hooks/useLayoutEditor.js';
 
-export const FireView = ({ user }) => {
+export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
     const {
         isRecording,
         transcript,
@@ -358,7 +358,7 @@ export const FireView = ({ user }) => {
 
         setIsAnalyzing(true);
         try {
-            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE', null, manualEvents);
+            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE', activeTemplate, manualEvents);
 
             // Use existing ID if available, else new one
             const reportId = currentReportId || Math.floor(Date.now() % 10000);
@@ -392,11 +392,13 @@ export const FireView = ({ user }) => {
                 timestamp: new Date().toISOString(),
                 mode: 'FIRE',
                 userId: user.uid,
-                status: 'completed' // Mark as completed
+                status: 'completed', // Mark as completed
+                templateUsed: activeTemplate?.title || 'Generative'
             };
 
             setReport(reportWithMeta);
             setPersistedTranscript(activeTranscript);
+            setActiveTemplate(null);
 
             // Update local storage for active report view
             localStorage.setItem('fire_report', JSON.stringify(reportWithMeta));
@@ -498,12 +500,14 @@ export const FireView = ({ user }) => {
                 {!report && !isAnalyzing && (
                     <div className="text-center py-12 animate-fade-in">
                         <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 text-glow">
-                            {displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?'}
+                            {activeTemplate ? `Active: ${activeTemplate.title}` : (displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?')}
                         </h2>
                         <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
-                            {displayTranscript
-                                ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
-                                : 'Tap the microphone to start recording your incident report.'}
+                            {activeTemplate
+                                ? "Recording will be analyzed using this specialized fire workflow."
+                                : (displayTranscript
+                                    ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
+                                    : 'Tap the microphone to start recording your incident report.')}
                         </p>
 
                         {/* Start Over Option (Only if we have content but aren't recording) */}
