@@ -21,8 +21,15 @@ export const RorkService = {
       2. ADD NEW ITEMS: based on the evolving scenario, add new critical tasks that the firefighter needs to do next.
       3. KEEP PENDING: If an item hasn't been done yet, keep it in the list.
       
-      CRITICAL: The list starts EMPTY. You MUST populate it based on the context.
-      Common standard items to consider adding (only if relevant to the specific call type):
+      CRITICAL RULES:
+      - The checklist starts EMPTY. You MUST populate it based on the context.
+      - **LIMIT: You MUST NEVER return more than 5 unresolved action items.** If there are more than 5 possible tasks, only return the absolute most critical, immediate life-safety or operational tasks. Ignore trivial or long-term items to prevent overwhelming the user.
+      - Do NOT remove completed items. Keep them but set isCompleted: true. (Completed items do NOT count towards the 5-item limit).
+      - Do NOT duplicate items.
+      - Be aggressive in marking items complete if the user says something like "Primary search complete" or "We have water on the fire".
+      - Keep descriptions short and actionable (e.g., "Establish RIT", "Utilities Control").
+      
+      Common standard items to consider adding (only if relevant and critical to the specific call type):
       - "Water supply" (if fire/suppression needed)
       - "Fire suppression" (if working fire)
       - "Primary search" (if search needed)
@@ -37,12 +44,6 @@ export const RorkService = {
         "isCompleted": boolean,
         "isNew": boolean (true if you just added it this turn)
       }
-      
-      IMPORTANT:
-      - Do NOT remove completed items. Keep them but set isCompleted: true.
-      - Do NOT duplicate items.
-      - Be aggressive in marking items complete if the user says something like "Primary search complete" or "We have water on the fire".
-      - Keep descriptions short and actionable (e.g., "Establish RIT", "Utilities Control").
       `;
 
     const requestBody = {
