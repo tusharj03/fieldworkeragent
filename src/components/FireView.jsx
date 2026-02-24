@@ -299,14 +299,23 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
 
         transcriptSegments.forEach(async (seg, idx) => {
             if (!seg.isEnglish && seg.isFinal && !translatedIndicesRef.current.has(idx)) {
+                // Mark synchronously to prevent race conditions calling translate multiple times
+                translatedIndicesRef.current.add(idx);
                 console.log("Triggering translation for:", seg.text);
+
                 try {
                     const translation = await RorkService.translate(seg.text);
                     console.log("Translation success:", translation);
-                    translatedIndicesRef.current.add(idx);
-                    setLiveTranslations(prev => [...prev.slice(-4), { original: seg.text, translated: translation, timestamp: new Date() }]);
+
+                    setLiveTranslations(prev => {
+                        // Extra safeguard against duplicate UI rendering of the same sentence
+                        if (prev.some(t => t.original === seg.text)) return prev;
+                        return [...prev.slice(-4), { original: seg.text, translated: translation, timestamp: new Date() }];
+                    });
                 } catch (e) {
                     console.error("Translation failed", e);
+                    // On failure, remove from tracking so it can be retried on next render
+                    translatedIndicesRef.current.delete(idx);
                 }
             }
         });
