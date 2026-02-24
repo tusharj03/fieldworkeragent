@@ -38,6 +38,8 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
 
     const [actionItems, setActionItems] = useState([]);
     const [notes, setNotes] = useState([]);
+    const [liveTranslations, setLiveTranslations] = useState([]);
+    const translatedIndicesRef = useRef(new Set());
     // Transcript State Management
     // ---------------------------
     // Track the ID of the current in-progress report
@@ -91,6 +93,14 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
     });
 
     const [error, setError] = useState(null);
+
+    // Effect: Clear translated indices on reset
+    useEffect(() => {
+        if (transcriptSegments.length === 0) {
+            translatedIndicesRef.current.clear();
+            setLiveTranslations([]);
+        }
+    }, [transcriptSegments.length]);
 
     // Combine restored text (from previous session) with live text (from current session)
     const activeTranscript = useMemo(() => {
@@ -283,9 +293,48 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
         return () => clearInterval(interval);
     }, [isRecording]);
 
+    // Live Translation Effect
+    useEffect(() => {
+        if (!isRecording) return;
+
+        transcriptSegments.forEach(async (seg, idx) => {
+            if (!seg.isEnglish && seg.isFinal && !translatedIndicesRef.current.has(idx)) {
+                console.log("Triggering translation for:", seg.text);
+                try {
+                    const translation = await RorkService.translate(seg.text);
+                    console.log("Translation success:", translation);
+                    translatedIndicesRef.current.add(idx);
+                    setLiveTranslations(prev => [...prev.slice(-4), { original: seg.text, translated: translation, timestamp: new Date() }]);
+                } catch (e) {
+                    console.error("Translation failed", e);
+                }
+            }
+        });
+    }, [transcriptSegments, isRecording]);
+
+    // Translation auto-clear effect
+    useEffect(() => {
+        if (liveTranslations.length > 0) {
+            const timer = setTimeout(() => {
+                setLiveTranslations(prev => prev.slice(1));
+            }, 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [liveTranslations]);
 
 
 
+
+
+    const resumeFromReport = () => {
+        // Set everything back to "live" mode
+        setRestoredTranscript(persistedTranscript);
+        setReport(null);
+        setError(null);
+        localStorage.removeItem('fire_report');
+        // We don't clear the transcript, we resume it
+        startRecording();
+    };
 
     const handleToggleRecording = () => {
         if (isRecording) {
@@ -498,21 +547,40 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                 )}
 
                 {/* Welcome / Status */}
-                {!report && !isAnalyzing && (
+                {!isAnalyzing && (
                     <div className="text-center py-12 animate-fade-in">
-                        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 text-glow">
-                            {activeTemplate ? `Active: ${activeTemplate.title}` : (displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?')}
-                        </h2>
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                            <h2 className="text-3xl md:text-4xl font-bold text-white text-glow">
+                                {report
+                                    ? 'Incident Report'
+                                    : (activeTemplate ? `Active: ${activeTemplate.title}` : (displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?'))}
+                            </h2>
+                            {(displayTranscript || report) && (
+                                <button
+                                    onClick={report ? resumeFromReport : (isRecording ? stopRecording : startRecording)}
+                                    title={isRecording ? "Pause" : (report ? "Resume Recording" : "Resume")}
+                                    className="p-3 rounded-full bg-transparent border border-white/20 text-white/50 hover:text-white transition-all backdrop-blur-sm hover:border-white/40 hover:scale-105 flex items-center justify-center"
+                                >
+                                    {isRecording ? (
+                                        <Pause size={20} fill="currentColor" />
+                                    ) : (
+                                        <Play size={20} fill="currentColor" className="ml-0.5" />
+                                    )}
+                                </button>
+                            )}
+                        </div>
                         <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
-                            {activeTemplate
-                                ? "Recording will be analyzed using this specialized fire workflow."
-                                : (displayTranscript
-                                    ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
-                                    : 'Tap the microphone to start recording your incident report.')}
+                            {report
+                                ? "Report generated from transcript. Click Play to add more detail."
+                                : (activeTemplate
+                                    ? "Recording will be analyzed using this specialized fire workflow."
+                                    : (displayTranscript
+                                        ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
+                                        : 'Tap the microphone to start recording your incident report.'))}
                         </p>
 
                         {/* Start Over Option (Only if we have content but aren't recording) */}
-                        {displayTranscript && !isRecording && (
+                        {displayTranscript && !isRecording && !report && (
                             <button
                                 onClick={handleStartNew}
                                 className="mt-6 text-sm text-red-400 hover:text-red-300 underline decoration-red-500/30 hover:decoration-red-400 underline-offset-4 transition-all block mx-auto"
@@ -549,52 +617,30 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {layoutOrder.map(key => {
-                                    if (key === 'transcript') {
-                                        return (
-                                            <SortableItem key="transcript" id="transcript" isEditing={isEditingLayout} className={`${actionItems.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-                                                <div className="glass-panel rounded-2xl p-6 md:p-8 h-full transition-all duration-500 overflow-hidden flex flex-col">
-                                                    <div className="flex items-center justify-between mb-4 shrink-0">
-                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                            {report ? 'Report Transcript' : 'Live Transcript'}
-                                                        </span>
-                                                        {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                                {/* Live Translation Panel */}
+                                {liveTranslations.length > 0 && (
+                                    <div className="lg:col-span-3 animate-fade-in mb-2">
+                                        <div className="glass-panel border-purple-500/30 bg-purple-500/5 rounded-2xl p-5 border-l-4 border-l-purple-500">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Layers size={16} className="text-purple-400" />
+                                                <h3 className="text-purple-400 font-bold uppercase tracking-wider text-xs">Live Translation (EN)</h3>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {liveTranslations.map((tr, idx) => (
+                                                    <div key={idx} className="animate-slide-up">
+                                                        <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 opacity-50">Original: {tr.original}</div>
+                                                        <div className="text-lg text-white font-medium leading-tight">"{tr.translated}"</div>
                                                     </div>
-                                                    <div
-                                                        className="overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-[150px] max-h-[500px]"
-                                                        ref={transcriptScrollRef}
-                                                        onScroll={handleTranscriptScroll}
-                                                    >
-                                                        <div className="text-lg md:text-xl leading-relaxed text-slate-200 font-light whitespace-pre-wrap">
-                                                            {restoredTranscript && (
-                                                                <span className="opacity-100">
-                                                                    {restoredTranscript.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/g, '')}
-                                                                </span>
-                                                            )}
-                                                            {transcriptSegments.map((seg, idx) => {
-                                                                const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '').replace(/\[\[TIME \d{2}:\d{2}:\d{2}\]\]/g, '');
-                                                                if (!text.trim() && (seg.text.includes('[[PAUSE') || seg.text.includes('[[TIME'))) return null;
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                                                return (
-                                                                    <React.Fragment key={idx}>
-                                                                        {(idx > 0 || restoredTranscript) && ' '}
-                                                                        <span
-                                                                            className={`transition-opacity duration-300 ${seg.isFinal ? 'opacity-100' : 'opacity-50 italic'}`}
-                                                                        >
-                                                                            {text}
-                                                                        </span>
-                                                                    </React.Fragment>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </SortableItem>
-                                        );
-                                    }
+                                {layoutOrder.map(key => {
                                     if (key === 'checklist' && actionItems.length > 0) {
                                         return (
-                                            <SortableItem key="checklist" id="checklist" isEditing={isEditingLayout} className="lg:col-span-1 animate-slide-in-right">
+                                            <SortableItem key="checklist" id="checklist" isEditing={isEditingLayout} className="lg:col-span-3 animate-slide-in-right">
                                                 <FireActionItems items={actionItems} onToggle={handleToggleActionItem} />
                                             </SortableItem>
                                         );
@@ -687,6 +733,7 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                         isRecording={isRecording}
                         onClick={handleToggleRecording}
                         disabled={isAnalyzing}
+                        title={isRecording ? "Stop & Analyze" : "Start/Resume Recording"}
                     />
                 </div>
             </div>

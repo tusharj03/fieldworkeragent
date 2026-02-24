@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { User, Mail, Shield, Save, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Mail, Shield, Save, ArrowLeft, CheckCircle, AlertCircle, Fingerprint } from 'lucide-react';
+import { PasskeyService } from '../services/passkey';
 
 export function Profile({ user, onBack }) {
     const [displayName, setDisplayName] = useState(user.displayName || '');
@@ -34,6 +35,29 @@ export function Profile({ user, onBack }) {
         } catch (error) {
             console.error(error);
             setMsg({ type: 'error', text: 'Failed to send reset email.' });
+        }
+    };
+
+    const handleEnrollPasskey = async () => {
+        setLoading(true);
+        setMsg({ type: '', text: '' });
+        try {
+            const isSupported = await PasskeyService.isSupported();
+            if (!isSupported) {
+                throw new Error("Face ID / Touch ID is not supported on this device/browser.");
+            }
+
+            await PasskeyService.register(user.email, user.displayName);
+            setMsg({ type: 'success', text: 'Biometric access enrolled successfully!' });
+        } catch (error) {
+            console.error(error);
+            if (error.name === 'NotAllowedError') {
+                setMsg({ type: 'error', text: 'Enrollment canceled or timed out.' });
+            } else {
+                setMsg({ type: 'error', text: error.message || 'Failed to enroll biometric access.' });
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -97,10 +121,33 @@ export function Profile({ user, onBack }) {
                         <button
                             type="button"
                             onClick={handlePasswordReset}
-                            className="text-sm text-red-400 hover:text-red-300 hover:underline transition-colors flex items-center gap-2"
+                            className="text-sm text-red-400 hover:text-red-300 hover:underline transition-colors flex items-center gap-2 mb-4"
                         >
                             Send Password Reset Email
                         </button>
+
+                        <div className="bg-slate-950 p-4 rounded-xl border border-white/5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                                    <Fingerprint size={16} className="text-orange-500" />
+                                    Passkey Access
+                                </div>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${localStorage.getItem('beacon_passkeys') && JSON.parse(localStorage.getItem('beacon_passkeys'))[user.email] ? 'bg-green-500/20 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                                    {localStorage.getItem('beacon_passkeys') && JSON.parse(localStorage.getItem('beacon_passkeys'))[user.email] ? 'Enrolled' : 'Not Set'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                                Use secure passkeys to sign in faster without entering your password every time.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleEnrollPasskey}
+                                disabled={loading}
+                                className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg transition-all border border-white/5"
+                            >
+                                {localStorage.getItem('beacon_passkeys') && JSON.parse(localStorage.getItem('beacon_passkeys'))[user.email] ? 'Re-enroll Passkey' : 'Enroll Passkey'}
+                            </button>
+                        </div>
                     </div>
 
                     {msg.text && (

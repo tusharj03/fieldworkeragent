@@ -103,10 +103,29 @@ export const RorkService = {
       Your job is to listen to the firefighter's transcript and extract technical data for incident reporting.
       Current System Time: ${currentTime}
       
+      MULTILINGUAL SUPPORT & AUTO-TRANSLATION:
+      The transcript may contain speech in languages other than English (e.g., Spanish, French, etc.). 
+      Your task is to:
+      1. DETECT non-English speech.
+      2. TRANSLATE it into high-fidelity English for the final report.
+      3. MAINTAIN technical fire service terminology and tactical roles during translation.
+      4. The final report MUST be entirely in English, regardless of the input language.
+      
       CRITICAL TIMELINE INSTRUCTION: The transcript contains embedded, invisible timestamps at natural pauses formatted like [[PAUSE 14:32:05]]. You MUST use these exact markers to determine the true, real-world time of events when building the timeline. DO NOT guess or hallucinate times. Match the event to the nearest preceding or succeeding PAUSE marker.
 
       ${template ? `Focus specifically on the "${template.title}" workflow: ${template.description}` : ''}
       ${eventsContext}
+      
+      TECHNICAL VOCABULARY CORRECTION:
+      Firefighters use specialized lingo that speech-to-text often misinterprets. You MUST correct these in your analysis:
+      - "inch and a half" -> If context implies a heavy line or larger flow, it may actually be "deuce and a half" (2.5 inch).
+      - "deuce and a half" = 2.5" hose line.
+      - "inch and three quarter" = 1.75" hose line.
+      - "RIT" or "RIC" = Rapid Intervention Team/Crew.
+      - "Primary" = Primary Search.
+      - "Secondary" = Secondary Search.
+      - "Knockdown" = Fire is largely extinguished.
+      - "Overhaul" = Checking for hidden fire.
       
       Return a JSON object with this EXACT structure:
       {
@@ -134,7 +153,7 @@ export const RorkService = {
         "neris_data": {
             "incident_type": "Likely NERIS incident type description (MUST NOT INCLUDE NUMBERS)",
             "property_use": "Likely NERIS property use description (MUST NOT INCLUDE NUMBERS)",
-            "entities_involved": ["List people/agencies involved"],
+            "entities_involved": ["List units/agencies with their tactical roles, e.g., 'Engine 2454 (Fire Attack)', 'Truck 12 (Ventilation)', 'Rescue 10 (Primary Search)'"],
             "stabilization_status": "Controlled | Uncontrolled | Under Investigation"
         },
         "hazards": [
@@ -152,6 +171,13 @@ export const RorkService = {
       systemPrompt = `You are an expert EMS/Paramedic reporting assistant.
         Your job is to listen to the paramedic's transcript and extract clinical data for patient care reports.
         Current System Time: ${currentTime}
+        
+        MULTILINGUAL SUPPORT & AUTO-TRANSLATION:
+        The transcript may contain speech in languages other than English (e.g., Spanish, patients speaking their native tongue). 
+        Your task is to:
+        1. DETECT non-English speech.
+        2. TRANSLATE it into high-fidelity English for the final report.
+        3. The final report MUST be entirely in English, regardless of the input language.
         
         CRITICAL TIMELINE INSTRUCTION: The transcript contains embedded, invisible timestamps at natural pauses formatted like [[PAUSE 14:32:05]]. You MUST use these exact markers to determine the true, real-world time of interventions or status changes when building the timeline. DO NOT guess or hallucinate times. Match the event to the nearest preceding or succeeding PAUSE marker.
 
@@ -232,6 +258,34 @@ export const RorkService = {
     } catch (error) {
       console.error('Rork AI Error:', error);
       throw error;
+    }
+  },
+
+  async translate(text) {
+    const systemPrompt = "You are a highly accurate real-time translator for Fire and EMS operations. Translate the following speech into English. Return ONLY the translated text, no chatter.";
+    const requestBody = {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: text }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch('https://toolkit.rork.com/text/llm/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) return text;
+      const data = await response.json();
+      return data.completion.trim();
+    } catch (e) {
+      return text;
     }
   },
 

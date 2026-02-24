@@ -439,9 +439,9 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
         ) : null,
         neris: (isFireMode && report.neris_data) ? (
             <SortableItem key="neris" id="neris" isEditing={isEditingLayout}>
-                <div className="pt-6 border-t border-white/5 space-y-3 mb-6">
+                <div className="pt-6 border-t border-white/5 space-y-4 mb-6">
                     <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                        <Layers size={14} className="text-purple-400" /> NERIS Classifications
+                        <Layers size={14} className="text-purple-400" /> NERIS Classifications & Resources
                     </h4>
                     <div className="grid md:grid-cols-2 gap-4">
                         <div className="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex flex-col justify-center group hover:border-purple-500/30 transition-colors">
@@ -457,6 +457,18 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                             </span>
                         </div>
                     </div>
+                    {report.neris_data.entities_involved && report.neris_data.entities_involved.length > 0 && (
+                        <div className="space-y-2">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase ml-1">Assigned Resources</span>
+                            <div className="flex flex-wrap gap-2">
+                                {report.neris_data.entities_involved.map((entity, i) => (
+                                    <span key={i} className="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium">
+                                        {entity}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </SortableItem>
         ) : null
@@ -533,17 +545,6 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                     <Download size={18} className="group-hover:animate-bounce" />
                     Download Official PDF Packet
                 </button>
-
-                {audioUrl && (
-                    <a
-                        href={audioUrl}
-                        download={`recording-${report.id || 'session'}.webm`}
-                        className="px-6 py-3 rounded-xl glass-button flex items-center justify-center gap-2 font-semibold hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
-                    >
-                        <Mic size={18} />
-                        Download Original Recording
-                    </a>
-                )}
 
                 <button
                     onClick={async () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Mic, Square } from 'lucide-react';
 
-export function MicrophoneButton({ isRecording, onClick, disabled }) {
+export function MicrophoneButton({ isRecording, onClick, disabled, title }) {
     return (
         <button
             onClick={onClick}
@@ -19,7 +19,8 @@ export function MicrophoneButton({ isRecording, onClick, disabled }) {
                 height: '80px',
                 backgroundColor: isRecording ? 'var(--color-recording)' : 'var(--color-primary)'
             }}
-            aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+            aria-label={title || (isRecording ? "Stop Recording" : "Start Recording")}
+            title={title || (isRecording ? "Stop & Analyze" : "Start Recording")}
         >
             {isRecording ? (
                 <Square size={32} fill="currentColor" />

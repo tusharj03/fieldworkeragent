@@ -279,19 +279,6 @@ export const PdfService = {
                 finalY = doc.lastAutoTable.finalY + 10;
             }
 
-            // 7. Transcript
-            if (transcript) {
-                autoTable(doc, {
-                    startY: finalY,
-                    head: [['TRANSCRIPT RECORD']],
-                    body: [[transcript]],
-                    theme: 'plain',
-                    headStyles: { fillColor: theme.bg.header, textColor: theme.text.medium, fontStyle: 'bold' },
-                    bodyStyles: { textColor: theme.text.medium, fontSize: 8, font: 'courier' },
-                    margin: { left: margin, right: margin }
-                });
-            }
-
             // Apply Headers/Footers
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {

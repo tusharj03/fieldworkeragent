@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
 
-const DEFAULT_LIVE_LAYOUT = ['transcript', 'checklist', 'notes'];
+const DEFAULT_LIVE_LAYOUT = ['checklist', 'notes'];
 const DEFAULT_REPORT_LAYOUT = [
     'summary',
     'scene_info',
@@ -10,7 +10,6 @@ const DEFAULT_REPORT_LAYOUT = [
     'chief_complaint',
     'timeline',
     'actions',
-    'hazards',
     'neris'
 ];
 

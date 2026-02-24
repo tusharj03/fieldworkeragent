@@ -9,10 +9,21 @@ export const useRealtimeTranscription = () => {
     const [error, setError] = useState(null);
 
     const silenceTimerRef = useRef(null);
-
     const mediaRecorderRef = useRef(null);
     const deepgramConnectionRef = useRef(null);
     const apiKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
+
+    const stopRecording = useCallback(() => {
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+        if (deepgramConnectionRef.current) {
+            deepgramConnectionRef.current.finish();
+            deepgramConnectionRef.current = null;
+        }
+        setIsRecording(false);
+    }, []);
 
     const startRecording = useCallback(async () => {
         if (!apiKey) {
@@ -26,14 +37,28 @@ export const useRealtimeTranscription = () => {
 
             const connection = deepgram.listen.live({
                 model: 'nova-2',
-                language: 'en-US',
+                language: 'multi',
                 smart_format: true,
                 diarize: true,
                 interim_results: true,
+                endpointing: 100,
                 utterance_end_ms: 1000,
                 vad_events: true,
                 filler_words: false,
                 punctuate: true,
+                keywords: [
+                    'deuce and a half:2',
+                    'inch and three quarter:2',
+                    'primary search:2',
+                    'secondary search:2',
+                    'knockdown:2',
+                    'overhaul:2',
+                    'ventilation:2',
+                    'staging:2',
+                    'mayday:3',
+                    'RIT:2',
+                    'SCBA:2'
+                ]
             });
 
             deepgramConnectionRef.current = connection;
@@ -110,15 +135,37 @@ export const useRealtimeTranscription = () => {
                 if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
                 const alt = data.channel.alternatives[0];
-                const text = alt.transcript.trim(); // TRIM to prevent inconsistent spacing
+                let text = alt.transcript.trim();
                 const isFinal = data.is_final;
+
+                // When using language='multi', languages are in alt.languages and word.language
+                const languages = alt.languages || [];
+                const wordLanguages = Array.from(new Set(alt.words?.map(w => w.language).filter(Boolean) || []));
+                const detectedLanguages = languages.length > 0 ? languages : wordLanguages;
+
+                const language = detectedLanguages[0] || 'en';
+                // Aggressive check: if any detected language is non-English, or if text contains common Spanish words
+                const spanishKeywords = /\b(hola|duele|pecho|ayuda|paciente|bomberos|fuego|casa|donde)\b/i;
+                const isEnglish = !detectedLanguages.some(l => !l.startsWith('en')) && !spanishKeywords.test(text);
+
+                let shouldPause = false;
+                // Check if 'pause' or similar words appear ANYWHERE in the current speech segment
+                const pauseRegex = /\b(pause|pause recording|stop recording|paws|paul's)\b/i;
+
+                if (pauseRegex.test(text)) {
+                    shouldPause = true;
+                    if (isFinal) {
+                        // Attempt to clean the text for the final segment by removing the command and everything after it
+                        text = text.split(pauseRegex)[0].trim();
+                    }
+                }
 
                 // Robust speaker detection
                 // If words exist, take the first word's speaker.
                 // If not, fallback to previous logical speaker or 0.
                 const speaker = alt.words?.[0]?.speaker ?? 0;
 
-                if (text.length > 0) {
+                if (text.length > 0 && !(shouldPause && !isFinal)) {
                     setActiveSpeakers(prev => {
                         if (prev.has(speaker)) return prev;
                         const next = new Set(prev);
@@ -134,20 +181,24 @@ export const useRealtimeTranscription = () => {
                             const lastSegment = newSegments[lastIndex];
                             // If the last one was a pause marker, we ALWAYS start a new actual text segment
                             if (lastSegment.text.includes('[[PAUSE')) {
-                                newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
+                                newSegments.push({ speaker, text, isFinal, timestamp: new Date(), language, isEnglish });
                             } else if (!lastSegment.isFinal) {
                                 // Overwrite the interim but KEEP the original segment timestamp (start of speaking)
-                                newSegments[lastIndex] = { ...lastSegment, speaker, text, isFinal };
+                                newSegments[lastIndex] = { ...lastSegment, speaker, text, isFinal, language, isEnglish };
                             } else {
                                 // Add new segment
-                                newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
+                                newSegments.push({ speaker, text, isFinal, timestamp: new Date(), language, isEnglish });
                             }
                         } else {
                             // First segment ever
-                            newSegments.push({ speaker, text, isFinal, timestamp: new Date() });
+                            newSegments.push({ speaker, text, isFinal, timestamp: new Date(), language, isEnglish });
                         }
                         return newSegments;
                     });
+                }
+
+                if (shouldPause) {
+                    setTimeout(() => stopRecording(), 50);
                 }
             });
 
@@ -164,7 +215,7 @@ export const useRealtimeTranscription = () => {
             console.error('Failed to start recording:', err);
             setError('Could not access microphone.');
         }
-    }, [apiKey]);
+    }, [apiKey, stopRecording]);
 
     // Compute flattened transcript with clean spacing and hidden timestamps
     const transcript = useMemo(() => {
@@ -181,18 +232,6 @@ export const useRealtimeTranscription = () => {
             .replace(/\s+/g, ' ') // Ensure no double spaces
             .trim();
     }, [transcriptSegments]);
-
-    const stopRecording = useCallback(() => {
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop();
-        }
-        if (deepgramConnectionRef.current) {
-            deepgramConnectionRef.current.finish();
-            deepgramConnectionRef.current = null;
-        }
-        setIsRecording(false);
-    }, []);
 
     const clearTranscript = useCallback(() => {
         setTranscriptSegments([]);
