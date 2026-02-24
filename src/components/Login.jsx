@@ -13,6 +13,7 @@ export function Login({ onLoginSuccess }) {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState(''); // New success message state
     const [loading, setLoading] = useState(false);
+    const [secureWithPasskey, setSecureWithPasskey] = useState(false); // New state for sign-up
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -26,6 +27,15 @@ export function Login({ onLoginSuccess }) {
                 // Optional: Update profile with name if you want to store it
                 if (name) {
                     await updateProfile(userCredential.user, { displayName: name });
+                }
+                // Optional Passkey Registration during Sign Up
+                if (secureWithPasskey) {
+                    try {
+                        await PasskeyService.register(email, name || email, password);
+                    } catch (pErr) {
+                        console.error("Passkey enrollment failed during sign up", pErr);
+                        // We don't block sign-up if passkey fails, just log it
+                    }
                 }
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
@@ -71,16 +81,17 @@ export function Login({ onLoginSuccess }) {
                 throw new Error("Face ID / Touch ID is not supported on this device or browser.");
             }
 
-            const { email: authedEmail } = await PasskeyService.authenticate(email);
-            // In a real app, you'd verify the assertion on the server and sign in with a custom token.
-            // For this demo, we'll simulate the Firebase sign-in state.
-            // Note: This requires the email to be valid in Firebase.
-            // If we have just the email from the passkey, we'd need a backend to give us a sign-in token.
-            // We'll show an error if they haven't registered yet.
+            const { email: authedEmail, password: authedPassword } = await PasskeyService.authenticate(email);
 
-            // For now, satisfy the UI by triggering the success callback
-            onLoginSuccess();
-            setSuccessMsg('Biometric authentication successful!');
+            if (authedPassword) {
+                // Real Firebase Login using the "unlocked" password
+                await signInWithEmailAndPassword(auth, authedEmail, authedPassword);
+                onLoginSuccess();
+                setSuccessMsg('Biometric authentication successful!');
+            } else {
+                // Fallback for older passkeys or missing data
+                setError("Account is registered but biometric login data is incomplete. Please sign in with password once and re-enroll.");
+            }
         } catch (err) {
             console.error(err);
             if (err.name === 'NotAllowedError') {
@@ -134,6 +145,22 @@ export function Login({ onLoginSuccess }) {
                                 placeholder="name@agency.com"
                             />
                         </div>
+
+                        {isSignUp && (
+                            <div className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-xl border border-white/5 animate-slide-up">
+                                <input
+                                    type="checkbox"
+                                    id="securePasskey"
+                                    checked={secureWithPasskey}
+                                    onChange={(e) => setSecureWithPasskey(e.target.checked)}
+                                    className="w-4 h-4 rounded border-white/10 bg-slate-950 text-orange-500 focus:ring-orange-500/50"
+                                />
+                                <label htmlFor="securePasskey" className="text-sm text-slate-300 flex items-center gap-2 cursor-pointer">
+                                    <Fingerprint size={16} className="text-orange-500" />
+                                    Secure with Passkey (Face ID)
+                                </label>
+                            </div>
+                        )}
 
                         <div>
                             <div className="flex items-center justify-between mb-2">

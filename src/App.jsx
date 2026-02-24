@@ -13,7 +13,10 @@ import { FireView } from './components/FireView';
 import { EmsView } from './components/EmsView';
 
 function App() {
-  const [mode, setMode] = useState(() => localStorage.getItem('app_mode') || 'EMS');
+  const [mode, setMode] = useState(() => {
+    if (window.location.pathname.includes('/ems')) return 'EMS';
+    return 'FIRE';
+  });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -92,22 +95,7 @@ function App() {
             </div>
           </div>
 
-          <div className="mb-6 px-2">
-            <div className="bg-slate-900/50 p-1 rounded-lg flex border border-white/5">
-              <button
-                onClick={() => setMode('EMS')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === 'EMS' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                EMS
-              </button>
-              <button
-                onClick={() => setMode('FIRE')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === 'FIRE' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                FIRE
-              </button>
-            </div>
-          </div>
+          {/* Mode toggle removed as per request - only accessible via /ems URL */}
 
           <nav className="flex-1 space-y-2">
             <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />

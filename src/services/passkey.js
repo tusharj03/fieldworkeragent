@@ -39,7 +39,7 @@ export const PasskeyService = {
      * @param {string} email - User's email
      * @param {string} displayName - User's name
      */
-    async register(email, displayName) {
+    async register(email, displayName, password = null) {
         const challenge = crypto.getRandomValues(new Uint8Array(32));
         const userId = crypto.getRandomValues(new Uint8Array(16));
 
@@ -78,6 +78,7 @@ export const PasskeyService = {
             id: credential.id,
             rawId: this._arrayBufferToBase64(credential.rawId),
             type: credential.type,
+            password: password // Demo only: Store password to allow Firebase login
         };
 
         const savedPasskeys = JSON.parse(localStorage.getItem('beacon_passkeys') || '{}');
@@ -135,6 +136,10 @@ export const PasskeyService = {
             throw new Error("Passkey recognized but no matching account found.");
         }
 
-        return { email: authenticatedEmail, assertion };
+        return {
+            email: authenticatedEmail,
+            assertion,
+            password: savedPasskeys[authenticatedEmail]?.password
+        };
     }
 };

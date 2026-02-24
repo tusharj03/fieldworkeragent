@@ -8,6 +8,7 @@ export function Profile({ user, onBack }) {
     const [displayName, setDisplayName] = useState(user.displayName || '');
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState({ type: '', text: '' });
+    const [enrollPassword, setEnrollPassword] = useState(''); // New state for enrolling passkey from profile
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
@@ -47,8 +48,13 @@ export function Profile({ user, onBack }) {
                 throw new Error("Face ID / Touch ID is not supported on this device/browser.");
             }
 
-            await PasskeyService.register(user.email, user.displayName);
-            setMsg({ type: 'success', text: 'Biometric access enrolled successfully!' });
+            if (!enrollPassword) {
+                throw new Error("Please enter your current password to link it with your Passkey.");
+            }
+
+            await PasskeyService.register(user.email, user.displayName, enrollPassword);
+            setMsg({ type: 'success', text: 'Passkey enrolled successfully!' });
+            setEnrollPassword(''); // Clear after success
         } catch (error) {
             console.error(error);
             if (error.name === 'NotAllowedError') {
@@ -139,14 +145,27 @@ export function Profile({ user, onBack }) {
                             <p className="text-xs text-slate-500 leading-relaxed">
                                 Use secure passkeys to sign in faster without entering your password every time.
                             </p>
-                            <button
-                                type="button"
-                                onClick={handleEnrollPasskey}
-                                disabled={loading}
-                                className="w-full text-xs bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-lg transition-all border border-white/5"
-                            >
-                                {localStorage.getItem('beacon_passkeys') && JSON.parse(localStorage.getItem('beacon_passkeys'))[user.email] ? 'Re-enroll Passkey' : 'Enroll Passkey'}
-                            </button>
+
+                            <div className="space-y-3">
+                                <input
+                                    type="password"
+                                    value={enrollPassword}
+                                    onChange={(e) => setEnrollPassword(e.target.value)}
+                                    placeholder="Enter password to link"
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleEnrollPasskey}
+                                    disabled={loading || !enrollPassword}
+                                    className={`w-full text-xs font-bold py-2.5 rounded-lg transition-all shadow-lg ${enrollPassword ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-500/10' : 'bg-slate-800 text-slate-500 shadow-none'}`}
+                                >
+                                    {localStorage.getItem('beacon_passkeys') && JSON.parse(localStorage.getItem('beacon_passkeys'))[user.email]
+                                        ? 'Update / Re-enroll Passkey'
+                                        : 'Enroll Passkey'
+                                    }
+                                </button>
+                            </div>
                         </div>
                     </div>
 
