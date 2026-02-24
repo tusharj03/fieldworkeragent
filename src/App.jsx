@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { History } from './components/History';
-import { Templates } from './components/Templates';
 import { Login } from './components/Login';
 import { Profile } from './components/Profile';
 import { auth } from './services/firebase';
@@ -21,7 +20,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
-  const [activeTemplate, setActiveTemplate] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('app_mode', mode);
@@ -99,8 +97,7 @@ function App() {
 
           <nav className="flex-1 space-y-2">
             <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
-            <NavItem icon={HistoryIcon} label="History" view="history" />
-            <NavItem icon={FileText} label="Templates" view="templates" />
+            {mode === 'FIRE' && <NavItem icon={HistoryIcon} label="History" view="history" />}
             <NavItem icon={LogOut} label="Sign Out" onClick={handleLogout} />
           </nav>
 
@@ -147,17 +144,9 @@ function App() {
 
           {currentView === 'dashboard' && (
             mode === 'FIRE' ? (
-              <FireView
-                user={user}
-                activeTemplate={activeTemplate}
-                setActiveTemplate={setActiveTemplate}
-              />
+              <FireView user={user} />
             ) : (
-              <EmsView
-                user={user}
-                activeTemplate={activeTemplate}
-                setActiveTemplate={setActiveTemplate}
-              />
+              <EmsView user={user} />
             )
           )}
 
@@ -177,16 +166,6 @@ function App() {
                   // or pass via props if we refactor App state.
                   // Assuming EMS might use a similar pattern or this is sufficient for now.
                 }
-                setCurrentView('dashboard');
-              }}
-            />
-          )}
-
-          {currentView === 'templates' && (
-            <Templates
-              mode={mode}
-              onSelectTemplate={(template) => {
-                setActiveTemplate(template);
                 setCurrentView('dashboard');
               }}
             />

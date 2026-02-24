@@ -146,7 +146,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 <div className="glass-panel rounded-xl p-5 mb-6">
                     <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        Patient Info
+                        {isFireMode ? "Patient Info" : "Extracted Patient Profile"}
                     </h4>
                     <div className="space-y-3">
                         <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
@@ -174,7 +174,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 <div className="glass-panel rounded-xl p-5 mb-6">
                     <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        Chief Complaint
+                        {isFireMode ? "Chief Complaint" : "Detected Primary Focus"}
                     </h4>
                     <div className="space-y-4">
                         <div>
@@ -191,7 +191,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
         ) : null,
         timeline: (report.vitals_timeline || report.interventions_timeline || report.timeline) ? (
             <SortableItem key="timeline" id="timeline" isEditing={isEditingLayout}>
-                <Section title={isFireMode ? "Fireground Timeline" : "Clinical Timeline"} icon={Clock}>
+                <Section title={isFireMode ? "Fireground Timeline" : "Extracted Timeline & Logs"} icon={Clock}>
                     <div className="space-y-8">
                         {/* FIRE TIMELINE */}
                         {isFireMode && report.timeline && (
@@ -209,12 +209,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         {/* EMS TIMELINES */}
                         {!isFireMode && report.vitals_timeline && (
                             <div>
-                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">VITALS VISUALIZATION</h4>
-                                <div className="mb-6">
-                                    <VitalsChart vitalsData={report.vitals_timeline} />
-                                </div>
-
-                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">VITALS LOG</h4>
+                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">DETECTED VITALS LOG</h4>
                                 <div className="overflow-x-auto rounded-lg border border-white/5">
                                     <table className="w-full text-sm text-left">
                                         <thead className="text-xs text-slate-400 uppercase bg-slate-900/60">
@@ -246,7 +241,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
 
                         {!isFireMode && report.interventions_timeline && (
                             <div>
-                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">INTERVENTIONS</h4>
+                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">DETECTED INTERVENTIONS</h4>
                                 <div className="space-y-3">
                                     {report.interventions_timeline.map((row, i) => (
                                         <div key={i} className="flex items-start gap-4 p-3 rounded-lg bg-slate-900/30 border border-white/5 hover:border-white/10 transition-colors">
@@ -266,7 +261,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
         ) : null,
         actions: (report.actions_taken || report.hazards || report.action_items || report.qa_flags) ? (
             <SortableItem key="actions" id="actions" isEditing={isEditingLayout}>
-                <Section title={isFireMode ? "Operations & Hazards" : "Suggested Follow-up Items"} icon={ShieldAlert}>
+                <Section title={isFireMode ? "Operations & Hazards" : "Structural Memory Anchors"} icon={ShieldAlert}>
                     <div className="grid md:grid-cols-2 gap-8 relative">
                         {/* FIRST COLUMN */}
                         <div>
@@ -313,7 +308,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                             ) : (
                                 <div className="space-y-3">
                                     <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
-                                        <ClipboardList size={14} className="text-slate-500" /> Action Items
+                                        <ClipboardList size={14} className="text-slate-500" /> Live Action Items
                                     </h4>
                                     <ul className="space-y-1">
                                         {report.action_items?.map((item, i) => (
@@ -405,7 +400,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
         ) : null,
         assessment: (!isFireMode && report.assessment) ? (
             <SortableItem key="assessment" id="assessment" isEditing={isEditingLayout}>
-                <Section title="Clinical Assessment" icon={FileText}>
+                <Section title={isFireMode ? "Clinical Assessment" : "Transcribed Clinical Narrative"} icon={FileText}>
                     <div className="grid md:grid-cols-2 gap-8">
                         <div className="space-y-4">
                             {Object.entries(report.assessment).map(([key, value]) => (
@@ -418,7 +413,7 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                         <div className="space-y-6">
                             {report.opqrst && (
                                 <div className="bg-slate-900/30 rounded-xl p-4 border border-white/5">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">OPQRST ANALYSIS</h4>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Extracted OPQRST Details</h4>
                                     <div className="space-y-2">
                                         {report.opqrst.map((item, i) => (
                                             <div key={i} className="flex justify-between items-center text-sm py-1.5 border-b border-white/5 last:border-0">
@@ -536,38 +531,47 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 </DndContext>
             </div>
 
-            {/* Actions Footer */}
-            <div className="flex flex-col md:flex-row gap-4 pt-4">
-                <button
-                    onClick={onExport}
-                    className={`flex-1 btn-primary group ${isFireMode ? 'bg-gradient-to-r from-red-600 to-orange-600 border-red-500/20' : ''}`}
-                >
-                    <Download size={18} className="group-hover:animate-bounce" />
-                    Download Official PDF Packet
-                </button>
+            {isFireMode ? (
+                <div className="flex flex-col md:flex-row gap-4 pt-4">
+                    <button
+                        onClick={onExport}
+                        className={`flex-1 btn-primary group ${isFireMode ? 'bg-gradient-to-r from-red-600 to-orange-600 border-red-500/20' : ''}`}
+                    >
+                        <Download size={18} className="group-hover:animate-bounce" />
+                        Download Official PDF Packet
+                    </button>
 
-                <button
-                    onClick={async () => {
-                        if (navigator.share) {
-                            try {
-                                await navigator.share({
-                                    title: `Field Report - ${report.category}`,
-                                    text: report.summary,
-                                    url: window.location.href
-                                });
-                            } catch (err) {
-                                console.error('Share failed:', err);
+                    <button
+                        onClick={async () => {
+                            if (navigator.share) {
+                                try {
+                                    await navigator.share({
+                                        title: `Field Report - ${report.category}`,
+                                        text: report.summary,
+                                        url: window.location.href
+                                    });
+                                } catch (err) {
+                                    console.error('Share failed:', err);
+                                }
+                            } else {
+                                alert('Sharing is not supported on this device/browser.');
                             }
-                        } else {
-                            alert('Sharing is not supported on this device/browser.');
-                        }
-                    }}
-                    className="px-6 py-3 rounded-xl glass-button flex items-center justify-center gap-2 font-semibold hover:bg-white/10"
-                >
-                    <Share2 size={18} />
-                    Share via Secure Link
-                </button>
-            </div>
+                        }}
+                        className="px-6 py-3 rounded-xl glass-button flex items-center justify-center gap-2 font-semibold hover:bg-white/10"
+                    >
+                        <Share2 size={18} />
+                        Share via Secure Link
+                    </button>
+                </div>
+            ) : (
+                <div className="pt-4 flex flex-col items-center">
+                    <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl text-center w-full mb-4">
+                        <p className="text-xs text-slate-500 font-mono leading-relaxed max-w-2xl mx-auto">
+                            ⚠️ BEACON DOES NOT RECORD, STORE, ARCHIVE, OR RETAIN AUDIO. BEACON PERFORMS REAL-TIME SIGNAL PROCESSING ONLY. BEACON IS NOT A MEDICAL DEVICE. THIS IS A COGNITIVE SUPPORT TOOL.
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -11,7 +11,7 @@ import { PdfService } from '../services/pdf.js';
 import { useRealtimeTranscription } from '../hooks/useRealtimeTranscription.js';
 import { useLayoutEditor } from '../hooks/useLayoutEditor.js';
 
-export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
+export const FireView = ({ user }) => {
     const {
         isRecording,
         transcript,
@@ -420,7 +420,7 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
 
         setIsAnalyzing(true);
         try {
-            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE', activeTemplate, manualEvents);
+            const result = await RorkService.analyzeTranscript(activeTranscript, 'FIRE', null, manualEvents);
 
             // Use existing ID if available, else new one
             const reportId = currentReportId || Math.floor(Date.now() % 10000);
@@ -455,12 +455,11 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                 mode: 'FIRE',
                 userId: user.uid,
                 status: 'completed', // Mark as completed
-                templateUsed: activeTemplate?.title || 'Generative'
+                templateUsed: 'Generative'
             };
 
             setReport(reportWithMeta);
             setPersistedTranscript(activeTranscript);
-            setActiveTemplate(null);
 
             // Update local storage for active report view
             localStorage.setItem('fire_report', JSON.stringify(reportWithMeta));
@@ -562,7 +561,7 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                             <h2 className="text-3xl md:text-4xl font-bold text-white text-glow">
                                 {report
                                     ? 'Incident Report'
-                                    : (activeTemplate ? `Active: ${activeTemplate.title}` : (displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?'))}
+                                    : (displayTranscript ? (isRecording ? 'Listening...' : 'Transcript Paused') : 'Ready to Report?')}
                             </h2>
                             {(displayTranscript || report) && (
                                 <button
@@ -581,11 +580,9 @@ export const FireView = ({ user, activeTemplate, setActiveTemplate }) => {
                         <p className="text-slate-400 text-lg max-w-lg mx-auto leading-relaxed">
                             {report
                                 ? "Report generated from transcript. Click Play to add more detail."
-                                : (activeTemplate
-                                    ? "Recording will be analyzed using this specialized fire workflow."
-                                    : (displayTranscript
-                                        ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
-                                        : 'Tap the microphone to start recording your incident report.'))}
+                                : (displayTranscript
+                                    ? (isRecording ? 'Keep speaking to add to your report.' : 'Tap the microphone to resume, or start over.')
+                                    : 'Tap the microphone to start recording your incident report.')}
                         </p>
 
                         {/* Start Over Option (Only if we have content but aren't recording) */}

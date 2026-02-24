@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@deepgram/sdk';
 
-export const useRealtimeTranscription = () => {
+export const useRealtimeTranscription = ({ ephemeral = false } = {}) => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcriptSegments, setTranscriptSegments] = useState([]); // Array of { speaker: number, text: string, isFinal: boolean }
     const [activeSpeakers, setActiveSpeakers] = useState(new Set());
@@ -83,14 +83,18 @@ export const useRealtimeTranscription = () => {
                         // Queue it up
                         unsentChunks.push(event.data);
                     }
-                    audioChunks.push(event.data);
+                    if (!ephemeral) {
+                        audioChunks.push(event.data);
+                    }
                 }
             });
 
             mediaRecorder.addEventListener('stop', () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const url = URL.createObjectURL(audioBlob);
-                setAudioUrl(url);
+                if (!ephemeral) {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(audioBlob);
+                    setAudioUrl(url);
+                }
                 stream.getTracks().forEach(track => track.stop());
             });
 
