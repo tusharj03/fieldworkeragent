@@ -9,6 +9,8 @@ const DEFAULT_REPORT_LAYOUT = [
     'patient_info',
     'chief_complaint',
     'timeline',
+    'assessment',
+    'notes',
     'actions',
     'neris'
 ];

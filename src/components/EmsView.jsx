@@ -39,7 +39,7 @@ export const EmsView = ({ user }) => {
 
     // Layout Editor capability
     const { isEditingLayout, layoutOrder, saveLayout, toggleEditMode, handleDragEnd } = useLayoutEditor('ems');
-    
+
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -69,10 +69,16 @@ export const EmsView = ({ user }) => {
         if (lowerTranscript.includes("intubate") || lowerTranscript.includes("intubation")) setShowIntubation(true);
         if (lowerTranscript.includes("crush syndrome") || lowerTranscript.includes("crushed")) setShowCrushProtocol(true);
 
-        // Note to Self Trigger
-        const noteMatches = fullTranscript.match(/note to self[\s\S]*?(?:end note|$)/gi);
+        // Note to Self / Make a Note Trigger
+        const noteMatches = fullTranscript.match(/(?:note to self|make a note|make a field note)[\s\S]*?(?:end note|$)/gi);
         if (noteMatches) {
-            const extracted = noteMatches.map(m => m.replace(/note to self/i, '').replace(/end note/i, '').replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '').trim()).filter(Boolean);
+            const extracted = noteMatches.map(m => m
+                .replace(/(?:note to self|make a note|make a field note)/i, '')
+                .replace(/end note/i, '')
+                .replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/gi, '')
+                .trim()
+            ).filter(Boolean);
+
             if (JSON.stringify(extracted) !== JSON.stringify(notes)) {
                 setNotes([...new Set(extracted)]);
             }
@@ -159,7 +165,8 @@ export const EmsView = ({ user }) => {
 
             const insightsMeta = {
                 ...result,
-                mode: 'EMS'
+                mode: 'EMS',
+                notes: [...new Set([...(result.notes || []), ...notes])]
             };
 
             setInsights(insightsMeta);

@@ -78,6 +78,23 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 </div>
             </SortableItem>
         ),
+        notes: (report.notes && report.notes.length > 0) ? (
+            <SortableItem key="notes" id="notes" isEditing={isEditingLayout}>
+                <div className="bg-yellow-500/10 rounded-xl p-5 border border-yellow-500/20 backdrop-blur-sm mb-6">
+                    <h3 className="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <ClipboardList size={14} /> Extracted Field Notes
+                    </h3>
+                    <ul className="space-y-2">
+                        {report.notes.map((note, i) => (
+                            <li key={i} className="text-sm text-yellow-100 flex items-start gap-2">
+                                <span className="text-yellow-600 mt-0.5">•</span>
+                                {note}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </SortableItem>
+        ) : null,
         scene_info: (isFireMode && !isMVA && report.scene_info) ? (
             <SortableItem key="scene_info" id="scene_info" isEditing={isEditingLayout}>
                 <div className="grid md:grid-cols-2 gap-4 mb-6">
@@ -141,54 +158,60 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                 </div>
             </SortableItem>
         ) : null,
-        patient_info: (!isFireMode && report.patient_info) ? (
+        patient_info: (!isFireMode && (report.patient_info || report.chief_complaint)) ? (
             <SortableItem key="patient_info" id="patient_info" isEditing={isEditingLayout}>
-                <div className="glass-panel rounded-xl p-5 mb-6">
-                    <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        {isFireMode ? "Patient Info" : "Extracted Patient Profile"}
-                    </h4>
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Name</span>
-                            <span className="font-medium text-slate-200">{report.patient_info.name}</span>
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                    {/* Patient Info Card */}
+                    {report.patient_info && (
+                        <div className="glass-panel rounded-xl p-5">
+                            <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                {isFireMode ? "Patient Info" : "Extracted Patient Profile"}
+                            </h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                                    <span className="text-slate-400">Name</span>
+                                    <span className="font-medium text-slate-200">{report.patient_info.name}</span>
+                                </div>
+                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                                    <span className="text-slate-400">Age</span>
+                                    <span className="font-medium text-slate-200">{report.patient_info.age}</span>
+                                </div>
+                                <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
+                                    <span className="text-slate-400">Sex</span>
+                                    <span className="font-medium text-slate-200">{report.patient_info.sex}</span>
+                                </div>
+                                <div className="flex justify-between items-baseline text-sm group">
+                                    <span className="text-slate-400">Mental Status</span>
+                                    <span className="font-medium text-slate-200 text-right max-w-[60%] leading-tight">{report.patient_info.mental_status}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Age</span>
-                            <span className="font-medium text-slate-200">{report.patient_info.age}</span>
+                    )}
+
+                    {/* Chief Complaint Card */}
+                    {report.chief_complaint && (
+                        <div className="glass-panel rounded-xl p-5">
+                            <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                {isFireMode ? "Chief Complaint" : "Detected Primary Focus"}
+                            </h4>
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Primary</span>
+                                    <p className="text-lg font-medium text-white leading-tight">{report.chief_complaint.primary}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Secondary</span>
+                                    <p className="text-sm text-slate-300 leading-relaxed">{report.chief_complaint.secondary}</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-baseline text-sm group border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Sex</span>
-                            <span className="font-medium text-slate-200">{report.patient_info.sex}</span>
-                        </div>
-                        <div className="flex justify-between items-baseline text-sm group">
-                            <span className="text-slate-400">Mental Status</span>
-                            <span className="font-medium text-slate-200 text-right max-w-[60%] leading-tight">{report.patient_info.mental_status}</span>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </SortableItem>
         ) : null,
-        chief_complaint: (!isFireMode && report.chief_complaint) ? (
-            <SortableItem key="chief_complaint" id="chief_complaint" isEditing={isEditingLayout}>
-                <div className="glass-panel rounded-xl p-5 mb-6">
-                    <h4 className="text-orange-400 font-semibold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        {isFireMode ? "Chief Complaint" : "Detected Primary Focus"}
-                    </h4>
-                    <div className="space-y-4">
-                        <div>
-                            <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Primary</span>
-                            <p className="text-lg font-medium text-white leading-tight">{report.chief_complaint.primary}</p>
-                        </div>
-                        <div>
-                            <span className="text-xs font-bold text-slate-500 uppercase block mb-1">Secondary</span>
-                            <p className="text-sm text-slate-300 leading-relaxed">{report.chief_complaint.secondary}</p>
-                        </div>
-                    </div>
-                </div>
-            </SortableItem>
-        ) : null,
+        chief_complaint: null,
         timeline: (report.vitals_timeline || report.interventions_timeline || report.timeline) ? (
             <SortableItem key="timeline" id="timeline" isEditing={isEditingLayout}>
                 <Section title={isFireMode ? "Fireground Timeline" : "Extracted Timeline & Logs"} icon={Clock}>
@@ -208,35 +231,41 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
 
                         {/* EMS TIMELINES */}
                         {!isFireMode && report.vitals_timeline && (
-                            <div>
-                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">DETECTED VITALS LOG</h4>
-                                <div className="overflow-x-auto rounded-lg border border-white/5">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-xs text-slate-400 uppercase bg-slate-900/60">
-                                            <tr>
-                                                <th className="px-4 py-3 font-medium">Time</th>
-                                                <th className="px-4 py-3 font-medium">BP</th>
-                                                <th className="px-4 py-3 font-medium">HR</th>
-                                                <th className="px-4 py-3 font-medium">RR</th>
-                                                <th className="px-4 py-3 font-medium">SpO2</th>
-                                                <th className="px-4 py-3 font-medium">O2</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5 bg-slate-900/20">
-                                            {report.vitals_timeline.map((row, i) => (
-                                                <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                    <td className="px-4 py-3 font-mono text-orange-400">{row.time}</td>
-                                                    <td className="px-4 py-3 text-slate-200">{row.bp}</td>
-                                                    <td className="px-4 py-3 text-slate-200">{row.hr}</td>
-                                                    <td className="px-4 py-3 text-slate-200">{row.rr}</td>
-                                                    <td className="px-4 py-3 text-slate-200">{row.spo2}</td>
-                                                    <td className="px-4 py-3 text-slate-200">{row.o2}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                            <>
+                                <div className="mb-6">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">VITALS VISUALIZATION</h4>
+                                    <VitalsChart vitalsData={report.vitals_timeline} />
                                 </div>
-                            </div>
+                                <div className="mb-6">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 pl-1">DETECTED VITALS LOG</h4>
+                                    <div className="overflow-x-auto rounded-lg border border-white/5">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="text-xs text-slate-400 uppercase bg-slate-900/60">
+                                                <tr>
+                                                    <th className="px-4 py-3 font-medium">Time</th>
+                                                    <th className="px-4 py-3 font-medium">BP</th>
+                                                    <th className="px-4 py-3 font-medium">HR</th>
+                                                    <th className="px-4 py-3 font-medium">RR</th>
+                                                    <th className="px-4 py-3 font-medium">SpO2</th>
+                                                    <th className="px-4 py-3 font-medium">O2</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5 bg-slate-900/20">
+                                                {report.vitals_timeline.map((row, i) => (
+                                                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                        <td className="px-4 py-3 font-mono text-orange-400">{row.time}</td>
+                                                        <td className="px-4 py-3 text-slate-200">{row.bp}</td>
+                                                        <td className="px-4 py-3 text-slate-200">{row.hr}</td>
+                                                        <td className="px-4 py-3 text-slate-200">{row.rr}</td>
+                                                        <td className="px-4 py-3 text-slate-200">{row.spo2}</td>
+                                                        <td className="px-4 py-3 text-slate-200">{row.o2}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
                         )}
 
                         {!isFireMode && report.interventions_timeline && (
@@ -394,6 +423,29 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                                 )
                             )}
                         </div>
+
+                        {/* EMS Billing Codes inside Actions panel */}
+                        {!isFireMode && report.billing_codes && (
+                            <div className="md:col-span-2 pt-6 mt-2 border-t border-white/5">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-3">
+                                    <DollarSign size={14} className="text-blue-400" /> Coding Analysis
+                                </h4>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="bg-slate-900/40 p-4 rounded-xl border border-white/5 flex flex-col justify-center">
+                                        <div className="flex items-start gap-4">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase w-24 shrink-0 text-right leading-tight mt-0.5">ICD-10 Recommendation</span>
+                                            <span className="text-sm font-bold text-slate-200 leading-snug">{report.billing_codes.icd10}</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-900/40 p-4 rounded-xl border border-white/5 flex flex-col justify-center">
+                                        <div className="flex items-start gap-4">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase w-24 shrink-0 text-right leading-tight mt-0.5">CPT / Service Level</span>
+                                            <span className="text-sm font-bold text-slate-200 leading-snug">{report.billing_codes.cpt}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Section>
             </SortableItem>
