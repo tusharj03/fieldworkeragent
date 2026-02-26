@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
 
-const DEFAULT_LIVE_LAYOUT = ['checklist', 'notes'];
+const DEFAULT_LIVE_FIRE_LAYOUT = ['checklist', 'notes'];
+const DEFAULT_LIVE_EMS_LAYOUT = ['checklist', 'transcript'];
 const DEFAULT_REPORT_LAYOUT = [
     'summary',
     'scene_info',
@@ -17,7 +18,12 @@ const DEFAULT_REPORT_LAYOUT = [
 
 export function useLayoutEditor(layoutType = 'live') {
     const storageKey = `layout_order_${layoutType}`;
-    const defaultLayout = layoutType === 'live' ? DEFAULT_LIVE_LAYOUT : DEFAULT_REPORT_LAYOUT;
+    let defaultLayout = DEFAULT_REPORT_LAYOUT;
+    if (layoutType === 'live' || layoutType === 'fire_live') {
+        defaultLayout = DEFAULT_LIVE_FIRE_LAYOUT;
+    } else if (layoutType === 'ems_live') {
+        defaultLayout = DEFAULT_LIVE_EMS_LAYOUT;
+    }
 
     const [isEditingLayout, setIsEditingLayout] = useState(false);
     const [layoutOrder, setLayoutOrder] = useState(() => {

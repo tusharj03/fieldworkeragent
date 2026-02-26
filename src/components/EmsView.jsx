@@ -8,6 +8,7 @@ import { Activity, AlertCircle, Timer, Pill, ShieldAlert, CheckSquare, Layers, P
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from './SortableItem';
+import { FireActionItems } from './FireActionItems';
 
 export const EmsView = ({ user }) => {
     const {
@@ -37,8 +38,12 @@ export const EmsView = ({ user }) => {
     // Extracted Notes State
     const [notes, setNotes] = useState([]);
 
+    // Action Items / Checklist State
+    const [actionItems, setActionItems] = useState([]);
+    const [manualEvents, setManualEvents] = useState([]);
+
     // Layout Editor capability
-    const { isEditingLayout, layoutOrder, saveLayout, toggleEditMode, handleDragEnd } = useLayoutEditor('ems');
+    const { isEditingLayout, layoutOrder, saveLayout, toggleEditMode, handleDragEnd } = useLayoutEditor('ems_live');
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -106,6 +111,50 @@ export const EmsView = ({ user }) => {
         });
     }, [transcriptSegments, isRecording]);
 
+    // Poll for Action Items Updates
+    const activeTranscriptRef = useRef(fullTranscript);
+    const actionItemsRef = useRef(actionItems);
+
+    useEffect(() => {
+        activeTranscriptRef.current = fullTranscript;
+        actionItemsRef.current = actionItems;
+    }, [fullTranscript, actionItems]);
+
+    useEffect(() => {
+        if (!isRecording) return;
+
+        const interval = setInterval(async () => {
+            if (!activeTranscriptRef.current.trim()) return;
+
+            try {
+                // Use the ref to get the latest transcript without restarting the interval
+                const updatedItems = await RorkService.updateActionItems(activeTranscriptRef.current, actionItemsRef.current);
+                setActionItems(updatedItems);
+            } catch (err) {
+                console.error("Failed to update action items", err);
+            }
+        }, 8000); // Slightly more frequent polling
+        return () => clearInterval(interval);
+    }, [isRecording]);
+
+    const handleToggleActionItem = (itemId) => {
+        setActionItems(prev => prev.map(item => {
+            if (item.id === itemId) {
+                const newStatus = !item.isCompleted;
+                // Record the event if it's being marked as completed
+                if (newStatus) {
+                    const event = {
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        description: `Action Completed: ${item.text}`
+                    };
+                    setManualEvents(prevEvents => [...prevEvents, event]);
+                }
+                return { ...item, isCompleted: newStatus };
+            }
+            return item;
+        }));
+    };
+
     // Timer Ticks
     useEffect(() => {
         let interval;
@@ -145,6 +194,8 @@ export const EmsView = ({ user }) => {
             setShowCrushProtocol(false);
             setLiveTranslations([]);
             setNotes([]);
+            setActionItems([]);
+            setManualEvents([]);
             translatedIndicesRef.current.clear();
 
             clearTranscript();
@@ -161,11 +212,34 @@ export const EmsView = ({ user }) => {
 
         setIsAnalyzing(true);
         try {
-            const result = await RorkService.analyzeTranscript(fullTranscript, 'EMS', null);
+            const result = await RorkService.analyzeTranscript(fullTranscript, 'EMS', null, manualEvents);
+
+            // MERGE MANUAL EVENTS INTO TIMELINE
+            if (manualEvents && manualEvents.length > 0) {
+                const existingTimeline = result.timeline || [];
+                const manualTimelineEvents = manualEvents.map(e => ({
+                    time: e.time,
+                    event: e.description
+                }));
+                const combinedTimeline = [...existingTimeline, ...manualTimelineEvents].sort((a, b) => {
+                    return a.time.localeCompare(b.time);
+                });
+                result.timeline = combinedTimeline;
+            }
+
+            // MERGE LIVE CHECKLIST ITEMS
+            const liveUncompleted = actionItemsRef.current.filter(item => !item.isCompleted).map(item => item.text);
+            const liveCompleted = actionItemsRef.current.filter(item => item.isCompleted).map(item => item.text);
+
+            const aiActionItems = result.action_items || [];
+            const mergedActionItems = [...new Set([...liveUncompleted, ...aiActionItems])];
+            const mergedActionsTaken = [...new Set([...(result.actions_taken || []), ...liveCompleted])];
 
             const insightsMeta = {
                 ...result,
                 mode: 'EMS',
+                action_items: mergedActionItems,
+                actions_taken: mergedActionsTaken,
                 notes: [...new Set([...(result.notes || []), ...notes])]
             };
 
@@ -188,6 +262,8 @@ export const EmsView = ({ user }) => {
         setShowCrushProtocol(false);
         setLiveTranslations([]);
         setNotes([]);
+        setActionItems([]);
+        setManualEvents([]);
         clearTranscript();
         startRecording();
     };
@@ -376,41 +452,14 @@ export const EmsView = ({ user }) => {
                         <SortableContext items={layoutOrder} strategy={verticalListSortingStrategy}>
                             <div className="flex flex-col gap-6">
                                 {layoutOrder.map((key) => {
-                                    if (key === 'transcript') {
+                                    if (key === 'checklist' && actionItems.length > 0) {
                                         return (
-                                            <SortableItem key="transcript" id="transcript" isEditing={isEditingLayout}>
-                                                <div className="glass-panel rounded-2xl p-6 md:p-8">
-                                                    <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                            Live Memory Buffer (Clears on stop)
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="space-y-4">
-                                                        {transcriptSegments.map((seg, idx) => {
-                                                            const text = seg.text.replace(/\[\[PAUSE \d{2}:\d{2}:\d{2}\]\]/g, '');
-                                                            if (!text.trim() && seg.text.includes('[[PAUSE')) return null;
-
-                                                            return (
-                                                                <div key={idx} className={`inline gap-4 transition-all duration-300 ${!seg.isFinal ? 'opacity-50 italic' : 'opacity-100'}`}>
-                                                                    <span className="text-lg md:text-xl leading-relaxed text-slate-200 font-light">
-                                                                        {text}
-                                                                        {!seg.isFinal && <span className="inline-block w-2 h-2 bg-orange-500 rounded-full animate-pulse ml-2 align-middle" />}
-                                                                    </span>
-                                                                    {' '}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                        {transcriptSegments.length === 0 && (
-                                                            <div className="text-center py-4 text-slate-500 italic">
-                                                                Signal detected but parsing...
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                            <SortableItem key="checklist" id="checklist" isEditing={isEditingLayout}>
+                                                <FireActionItems items={actionItems} onToggle={handleToggleActionItem} />
                                             </SortableItem>
                                         );
                                     }
+
                                     return null;
                                 })}
                             </div>
