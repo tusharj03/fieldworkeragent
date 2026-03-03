@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { History } from './components/History';
 import { Login } from './components/Login';
 import { Profile } from './components/Profile';
-import { auth } from './services/firebase';
+import { auth, analytics } from './services/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { setAnalyticsCollectionEnabled } from 'firebase/analytics';
 import { HardHat, LayoutDashboard, FileText, History as HistoryIcon, Menu, LogOut, Activity } from 'lucide-react';
 import BeaconLogo from './assets/beacon_logo.png';
 
@@ -23,6 +24,13 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('app_mode', mode);
+
+    // HIPAA Compliance: Disable external analytics telemetry during EMS mode
+    if (analytics) {
+      const isAnalyticsEnabled = mode !== 'EMS';
+      setAnalyticsCollectionEnabled(analytics, isAnalyticsEnabled);
+      console.log(`[HIPAA] Analytics collection enabled: ${isAnalyticsEnabled} (Mode: ${mode})`);
+    }
   }, [mode]);
 
   useEffect(() => {

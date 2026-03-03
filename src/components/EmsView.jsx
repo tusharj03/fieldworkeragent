@@ -4,6 +4,7 @@ import { ReportCard } from './ReportCard';
 import { useRealtimeTranscription } from '../hooks/useRealtimeTranscription';
 import { useLayoutEditor } from '../hooks/useLayoutEditor';
 import { RorkService } from '../services/rork';
+import { AuditService } from '../services/audit';
 import { Activity, AlertCircle, Timer, Pill, ShieldAlert, CheckSquare, Layers, Play, Pause, ArrowLeft, Settings } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -196,7 +197,7 @@ export const EmsView = ({ user }) => {
             setError(null);
             setInsights(null);
 
-            // Clear Cognitive Tools
+            // Explicitly zero arrays for HIPAA Memory Hygiene before resetting
             setCprStartTime(null);
             setEpiStartTime(null);
             setShowIntubation(false);
@@ -206,6 +207,11 @@ export const EmsView = ({ user }) => {
             setActionItems([]);
             setManualEvents([]);
             translatedIndicesRef.current.clear();
+
+            // Log Audit Event (PHI-free)
+            if (user?.uid) {
+                AuditService.logAccessEvent(user.uid, 'EMS_SESSION_STARTED');
+            }
 
             clearTranscript();
             startRecording();
@@ -217,6 +223,11 @@ export const EmsView = ({ user }) => {
         if (!fullTranscript.trim()) {
             setError("No speech signal detected.");
             return;
+        }
+
+        // Log Audit Event
+        if (user?.uid) {
+            AuditService.logAccessEvent(user.uid, 'EMS_ANALYSIS_RUN');
         }
 
         setIsAnalyzing(true);
@@ -282,6 +293,7 @@ export const EmsView = ({ user }) => {
     };
 
     const handleStartNew = () => {
+        // HIPAA Memory Hygiene: Explicitly zero out all possible PHI-containing arrays
         setInsights(null);
         setCprStartTime(null);
         setEpiStartTime(null);
@@ -291,8 +303,19 @@ export const EmsView = ({ user }) => {
         setNotes([]);
         setActionItems([]);
         setManualEvents([]);
+
+        // Log Audit Event
+        if (user?.uid) {
+            AuditService.logAccessEvent(user.uid, 'EMS_SESSION_WIPED');
+        }
+
         clearTranscript();
         startRecording();
+
+        // Audit log start mapping
+        if (user?.uid) {
+            AuditService.logAccessEvent(user.uid, 'EMS_SESSION_STARTED');
+        }
     };
 
     return (
