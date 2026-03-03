@@ -8,7 +8,7 @@ import { Activity, AlertCircle, Timer, Pill, ShieldAlert, CheckSquare, Layers, P
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from './SortableItem';
-import { FireActionItems } from './FireActionItems';
+import { EmsActionItems } from './EmsActionItems';
 
 export const EmsView = ({ user }) => {
     const {
@@ -128,7 +128,7 @@ export const EmsView = ({ user }) => {
 
             try {
                 // Use the ref to get the latest transcript without restarting the interval
-                const updatedItems = await RorkService.updateActionItems(activeTranscriptRef.current, actionItemsRef.current);
+                const updatedItems = await RorkService.updateActionItems(activeTranscriptRef.current, actionItemsRef.current, 'EMS');
                 setActionItems(updatedItems);
             } catch (err) {
                 console.error("Failed to update action items", err);
@@ -137,22 +137,31 @@ export const EmsView = ({ user }) => {
         return () => clearInterval(interval);
     }, [isRecording]);
 
-    const handleToggleActionItem = (itemId) => {
-        setActionItems(prev => prev.map(item => {
-            if (item.id === itemId) {
-                const newStatus = !item.isCompleted;
+    const handleToggleActionItem = (item) => {
+        const itemId = typeof item === 'string' ? item : item.id;
+        const itemName = typeof item === 'string' ? item : item.text;
+
+        setActionItems(prev => prev.map(current => {
+            if (current.id === itemId) {
+                const newStatus = !current.isCompleted;
                 // Record the event if it's being marked as completed
                 if (newStatus) {
                     const event = {
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        description: `Action Completed: ${item.text}`
+                        description: `Action Completed: ${itemName}`
                     };
                     setManualEvents(prevEvents => [...prevEvents, event]);
                 }
-                return { ...item, isCompleted: newStatus };
+                return { ...current, isCompleted: newStatus };
             }
-            return item;
+            return current;
         }));
+    };
+
+    const handleDismissActionItem = (item) => {
+        const itemId = typeof item === 'string' ? item : item.id;
+        // Simply remove the item from the list without adding it to manual events
+        setActionItems(prev => prev.filter(current => current.id !== itemId));
     };
 
     // Timer Ticks
@@ -228,12 +237,30 @@ export const EmsView = ({ user }) => {
             }
 
             // MERGE LIVE CHECKLIST ITEMS
-            const liveUncompleted = actionItemsRef.current.filter(item => !item.isCompleted).map(item => item.text);
-            const liveCompleted = actionItemsRef.current.filter(item => item.isCompleted).map(item => item.text);
+            // For EMS, actionItems are objects {id, text, trigger, source, ...}
+            const liveUncompleted = actionItemsRef.current.filter(item => !item.isCompleted);
+            const liveCompleted = actionItemsRef.current.filter(item => item.isCompleted);
 
             const aiActionItems = result.action_items || [];
-            const mergedActionItems = [...new Set([...liveUncompleted, ...aiActionItems])];
-            const mergedActionsTaken = [...new Set([...(result.actions_taken || []), ...liveCompleted])];
+
+            // Deduplicate items based on text content
+            const allItemsMap = new Map();
+
+            // Add live items first
+            liveUncompleted.forEach(item => {
+                allItemsMap.set(item.text, item);
+            });
+
+            // Merge in AI action items, keeping existing ones if they match
+            aiActionItems.forEach(item => {
+                const text = typeof item === 'string' ? item : item.text;
+                if (!allItemsMap.has(text)) {
+                    allItemsMap.set(text, item);
+                }
+            });
+
+            const mergedActionItems = Array.from(allItemsMap.values());
+            const mergedActionsTaken = [...new Set([...(result.actions_taken || []), ...liveCompleted.map(item => typeof item === 'string' ? item : item.text)])];
 
             const insightsMeta = {
                 ...result,
@@ -455,7 +482,11 @@ export const EmsView = ({ user }) => {
                                     if (key === 'checklist' && actionItems.length > 0) {
                                         return (
                                             <SortableItem key="checklist" id="checklist" isEditing={isEditingLayout}>
-                                                <FireActionItems items={actionItems} onToggle={handleToggleActionItem} />
+                                                <EmsActionItems
+                                                    items={actionItems}
+                                                    onAccept={handleToggleActionItem}
+                                                    onDismiss={handleDismissActionItem}
+                                                />
                                             </SortableItem>
                                         );
                                     }
@@ -493,10 +524,28 @@ export const EmsView = ({ user }) => {
                         <ReportCard
                             report={insights}
                             onActionComplete={(completedItem) => {
+                                const itemId = typeof completedItem === 'string' ? completedItem : completedItem.id;
+                                const itemText = typeof completedItem === 'string' ? completedItem : completedItem.text;
+
                                 const updatedInsights = {
                                     ...insights,
-                                    action_items: insights.action_items?.filter(i => i !== completedItem),
-                                    actions_taken: [...(insights.actions_taken || []), completedItem]
+                                    action_items: insights.action_items?.filter(i => {
+                                        const id = typeof i === 'string' ? i : i.id;
+                                        return id !== itemId;
+                                    }),
+                                    actions_taken: [...(insights.actions_taken || []), itemText]
+                                };
+                                setInsights(updatedInsights);
+                            }}
+                            onActionDismiss={(dismissedItem) => {
+                                const itemId = typeof dismissedItem === 'string' ? dismissedItem : dismissedItem.id;
+
+                                const updatedInsights = {
+                                    ...insights,
+                                    action_items: insights.action_items?.filter(i => {
+                                        const id = typeof i === 'string' ? i : i.id;
+                                        return id !== itemId;
+                                    })
                                 };
                                 setInsights(updatedInsights);
                             }}

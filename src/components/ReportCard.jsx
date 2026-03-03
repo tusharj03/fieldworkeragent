@@ -4,9 +4,10 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { VitalsChart } from './VitalsChart';
 import { SortableItem } from './SortableItem';
+import { ProgressiveActionItem } from './ProgressiveActionItem';
 import { useLayoutEditor } from '../hooks/useLayoutEditor';
 
-export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
+export function ReportCard({ report, onExport, audioUrl, onActionComplete, onActionDismiss }) {
     const topRef = useRef(null);
 
     useEffect(() => {
@@ -316,20 +317,24 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                                                 <ClipboardList size={14} className="text-slate-500" /> Suggested Action Items
                                             </h4>
                                             <ul className="space-y-1">
-                                                {report.action_items.map((item, i) => (
-                                                    <li key={i} className="group">
-                                                        <button
-                                                            onClick={() => onActionComplete && onActionComplete(item)}
-                                                            className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 py-1.5 px-2 -ml-2 rounded-lg' : ''}`}
-                                                            disabled={!onActionComplete}
-                                                        >
-                                                            <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
-                                                                {onActionComplete && <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                                                            </div>
-                                                            <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>{item}</span>
-                                                        </button>
-                                                    </li>
-                                                ))}
+                                                {report.action_items.map((item, i) => {
+                                                    // Handle string fallback for FIRE mode or older reports
+                                                    const text = typeof item === 'string' ? item : item.text;
+                                                    return (
+                                                        <li key={i} className="group">
+                                                            <button
+                                                                onClick={() => onActionComplete && onActionComplete(item)}
+                                                                className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 py-1.5 px-2 -ml-2 rounded-lg' : ''}`}
+                                                                disabled={!onActionComplete}
+                                                            >
+                                                                <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
+                                                                    {onActionComplete && <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                                                                </div>
+                                                                <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>{text}</span>
+                                                            </button>
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         </div>
                                     )}
@@ -339,19 +344,14 @@ export function ReportCard({ report, onExport, audioUrl, onActionComplete }) {
                                     <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">
                                         <ClipboardList size={14} className="text-slate-500" /> Live Action Items
                                     </h4>
-                                    <ul className="space-y-1">
+                                    <ul className="space-y-2">
                                         {report.action_items?.map((item, i) => (
-                                            <li key={i} className="group">
-                                                <button
-                                                    onClick={() => onActionComplete && onActionComplete(item)}
-                                                    className={`w-full text-left flex items-start gap-2.5 text-sm transition-all ${onActionComplete ? 'cursor-pointer hover:bg-emerald-500/10 py-1.5 px-2 -ml-2 rounded-lg' : ''}`}
-                                                    disabled={!onActionComplete}
-                                                >
-                                                    <div className={`w-4 h-4 rounded border mt-0.5 shrink-0 flex items-center justify-center transition-all ${onActionComplete ? 'border-slate-600 group-hover:border-emerald-500 group-hover:bg-emerald-500/20' : 'border-slate-600'}`}>
-                                                        {onActionComplete && <CheckCircle size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                                                    </div>
-                                                    <span className={`transition-colors ${onActionComplete ? 'text-slate-300 group-hover:text-emerald-100' : 'text-slate-300'}`}>{item}</span>
-                                                </button>
+                                            <li key={i}>
+                                                <ProgressiveActionItem
+                                                    item={item}
+                                                    onAccept={onActionComplete}
+                                                    onDismiss={onActionDismiss}
+                                                />
                                             </li>
                                         ))}
                                     </ul>

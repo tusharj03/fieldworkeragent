@@ -6,10 +6,11 @@ export const RorkService = {
    * Updates the list of action items based on the current transcript.
    * @param {string} transcript - The current accumulated transcript.
    * @param {Array} currentItems - The existing list of action items.
+   * @param {string} mode - 'EMS' or 'FIRE'.
    * @returns {Promise<Array>} - The updated list of action items.
    */
-  async updateActionItems(transcript, currentItems) {
-    const systemPrompt = `You are an expert Fire/Rescue AI assistant.
+  async updateActionItems(transcript, currentItems, mode = 'FIRE') {
+    let systemPrompt = `You are an expert Fire/Rescue AI assistant.
       Your job is to monitor a live transcript of a fire incident and update a dynamic checklist of action items.
       
       You will be given:
@@ -45,6 +46,39 @@ export const RorkService = {
         "isNew": boolean (true if you just added it this turn)
       }
       `;
+
+    if (mode === 'EMS') {
+      systemPrompt = `You are an expert EMS/Paramedic AI assistant.
+        Your job is to monitor a live transcript of a medical incident and suggest "Possible Considerations" to mitigate automation bias.
+        
+        You will be given:
+        1. The current list of considerations (some may be completed, some pending).
+        2. The latest transcript of the incident.
+        
+        Your goal is to:
+        1. MARK COMPLETED: If the transcript indicates an item has been done or dismissed, mark it as completed.
+        2. ADD NEW CONSIDERATIONS: based on the evolving scenario, add critical clinical considerations.
+        3. KEEP PENDING: If an item hasn't been addressed yet, keep it in the list.
+        
+        CRITICAL RULES:
+        - The list starts EMPTY. You MUST populate it based on the context.
+        - **LIMIT: You MUST NEVER return more than 3 unresolved action items.** 
+        - Do NOT remove completed items. Keep them but set isCompleted: true. 
+        - Do NOT duplicate items.
+        - Frame all new items as considerations (e.g., "Consider CPR", "Consider 12-lead ECG").
+        - Each item MUST include a "trigger" (what the user said that prompted this) and a "source" (the medical protocol/reasoning).
+        
+        Return a JSON object with a single key "items", which is an array of objects:
+        {
+          "id": "unique_string_id",
+          "text": "Consideration description",
+          "trigger": "User mentioned 'no pulse'",
+          "source": "AHA BLS Protocol 2020",
+          "isCompleted": boolean,
+          "isNew": boolean
+        }
+        `;
+    }
 
     const requestBody = {
       messages: [
@@ -218,7 +252,16 @@ export const RorkService = {
             {"field": "Severity", "extracted": "0-10", "status": "ok|warning"},
             {"field": "Time", "extracted": "...", "status": "ok|warning"}
         ],
-        "action_items": ["List of follow-up actions needed"],
+        "action_items": [
+            {
+               "id": "unique_id",
+               "text": "Consideration Description",
+               "trigger": "What prompted this recommendation",
+               "source": "Medical Protocol/Reasoning Reference",
+               "isCompleted": false,
+               "isNew": true
+            }
+        ],
         "qa_flags": ["List of quality assurance flags or protocol deviations"],
         "billing_codes": {
              "icd10": "Suspected code",
